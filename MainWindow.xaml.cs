@@ -25,6 +25,7 @@ public partial class MainWindow : Window
         AddButton.IsEnabled = canEdit;
         EditButton.IsEnabled = canEdit;
         DeleteButton.IsEnabled = _currentUser.Role == "Admin";
+        AdminMenuItem.Visibility = _currentUser.Role == "Admin" ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void LoadRecords()
@@ -127,6 +128,36 @@ public partial class MainWindow : Window
         using var db = new Data.AppDbContext();
         MessageBox.Show($"Всього записів: {db.Records.Count()}",
             "Звіт", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void PilotsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new SimpleDictionaryWindow(SimpleDictionaryKind.Pilots) { Owner = this };
+        dlg.ShowDialog();
+    }
+
+    private void WeaponsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new SimpleDictionaryWindow(SimpleDictionaryKind.Weapons) { Owner = this };
+        dlg.ShowDialog();
+    }
+
+    private void LostDroneReasonsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new SimpleDictionaryWindow(SimpleDictionaryKind.SubreasonLostDrone) { Owner = this };
+        dlg.ShowDialog();
+    }
+
+    private void TechProblemsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new SimpleDictionaryWindow(SimpleDictionaryKind.SubreasonTech) { Owner = this };
+        dlg.ShowDialog();
+    }
+
+    private void AddUserMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new AddUserWindow { Owner = this };
+        dlg.ShowDialog();
     }
 }
 

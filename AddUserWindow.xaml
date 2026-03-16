@@ -1,0 +1,38 @@
+<Window x:Class="AirLiticApp.AddUserWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Додати користувача" Height="260" Width="420"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Text="Логін:" VerticalAlignment="Center" Margin="0,0,10,10"/>
+        <TextBox x:Name="LoginTextBox" Grid.Column="1" Margin="0,0,0,10" MinWidth="220"/>
+
+        <TextBlock Grid.Row="1" Text="Пароль:" VerticalAlignment="Center" Margin="0,0,10,10"/>
+        <PasswordBox x:Name="PasswordBox" Grid.Row="1" Grid.Column="1" Margin="0,0,0,10"/>
+
+        <TextBlock Grid.Row="2" Text="Роль:" VerticalAlignment="Center" Margin="0,0,10,10"/>
+        <ComboBox x:Name="RoleComboBox" Grid.Row="2" Grid.Column="1" Margin="0,0,0,10" MinWidth="220"/>
+
+        <TextBlock Grid.Row="3" Grid.ColumnSpan="2" x:Name="ErrorText"
+                   Foreground="Red" Margin="0,0,0,10" TextWrapping="Wrap"/>
+
+        <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Width="100" Margin="0,0,8,0" Content="Зберегти" IsDefault="True" Click="Save_Click"/>
+            <Button Width="100" Content="Скасувати" IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
+
