@@ -16,7 +16,7 @@ public class AppDbContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        // Подключение к локальному SQL Server Express, БД airlitics
+        
         optionsBuilder.UseSqlServer(
             "Server=localhost\\SQLEXPRESS;Database=airlitics;Trusted_Connection=True;TrustServerCertificate=True;");
     }

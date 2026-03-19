@@ -1,6 +1,9 @@
+using System;
 using System.Collections.ObjectModel;
+using System.Data;
 using System.Linq;
 using System.Windows;
+using Microsoft.EntityFrameworkCore;
 
 namespace AirLiticApp;
 
@@ -130,6 +133,231 @@ public partial class MainWindow : Window
     private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void WeaponsReportMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        const string mainSql = @"
+declare @colls nvarchar(max);
+select @colls = string_agg(quotename(flying_result.name), ',')
+from flying_result;
+
+declare @sql nvarchar(max) = N'
+select
+    weaponName N''Засіб'',
+    TotalHits N''Кіл-ть вильотів'',
+    ' + @colls + ',
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([Уражено], 0) * 100 / TotalHits,2)
+    end N''KPI''
+from
+(
+    select
+        p.name as weaponName,
+        r.id   as ResultId,
+        rs.name as ReasonName
+    from results r
+    left join weapon         p  on p.id  = r.weapon_id
+    left join flying_result rs on rs.id = r.flying_result_id
+    where r.Date between ''2026-03-01'' and ''2026-03-31''
+) src
+pivot
+(
+    count(ResultId)
+    for ReasonName in (' + @colls + ')
+) p
+cross apply (
+    select
+        count(*) as TotalHits
+    from results rf
+    where rf.weapon_id = (
+        select top(1) id
+        from weapon
+        where name = p.weaponName
+    )
+      and rf.Date between ''2026-03-01'' and ''2026-03-31''
+) t;
+';
+exec sp_executesql @sql;
+";
+
+        const string lostSql = @"
+declare @colls nvarchar(max);
+
+select @colls = string_agg(quotename(name), ',')
+from subreason_lost_drone;
+
+declare @sql nvarchar(max) = N'
+select
+    weaponName N''Засіб'',
+    TotalHits N''Кіл-ть невдалих вильотів'',
+    ' + @colls + ',
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([вороже збиття], 0) * 100 / TotalHits,2)
+    end N''KPI вороже збиття''  ,
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([реб противника], 0) * 100 / TotalHits,2)
+    end N''KPI реб противника''   ,
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([технічні помилки], 0) * 100 / TotalHits,2)
+    end N''KPI технічні помилки''  ,
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([погодні умови], 0) * 100 / TotalHits,2)
+    end N''KPI погодні умови'',
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([реб свій], 0) * 100 / TotalHits,2)
+    end N''KPI реб свій'',
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([помилка пілота], 0) * 100 / TotalHits,2)
+    end N''KPI помилка пілота''
+from
+(
+    select
+        wp.name as weaponName,
+        r.id   as ResultId,
+        sld.name as ReasonName
+from results r
+left join weapon wp on wp.id =weapon_id
+left join subreason_lost_drone sld on sld.id=r.subreason_lost_drone_id
+where flying_result_id=2 and r.Date between ''2026-03-01'' and ''2026-03-31''
+) src
+pivot
+(
+    count(ResultId) 
+    for ReasonName in (' + @colls + ')
+) p
+cross apply (
+    select
+        count(*) as TotalHits
+    from results rf
+    where rf.weapon_id = (
+        select top(1) id
+        from weapon
+        where name = p.weaponName
+    ) 
+      and rf.Date between ''2026-03-01'' and ''2026-03-31''
+) t;
+';
+
+exec sp_executesql @sql;
+";
+
+        try
+        {
+            using var db = new Data.AppDbContext();
+            var conn = db.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+                conn.Open();
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = mainSql;
+            using var reader = cmd.ExecuteReader();
+            var mainTable = new DataTable();
+            mainTable.Load(reader);
+
+            // второй запрос – по невдалих вильотах
+            cmd.CommandText = lostSql;
+            using var reader2 = cmd.ExecuteReader();
+            var lostTable = new DataTable();
+            lostTable.Load(reader2);
+
+            var reportWindow = new WeaponsReportWindow(mainTable, lostTable) { Owner = this };
+            reportWindow.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                Data.DbHealth.IsDatabaseAvailable()
+                    ? ex.Message
+                    : Data.DbHealth.GetUnavailableMessage(),
+                "Помилка звіту",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private void PilotsReportMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        const string sql = @"
+declare @colls nvarchar(max);
+
+select @colls = string_agg(quotename(flying_result.name), ',')
+from flying_result;
+
+declare @sql nvarchar(max) = N'
+select
+    PilotName N''Пілот'' ,
+    TotalHits N''Кіл-ть вильотів'',
+    ' + @colls + ',
+    round(case
+        when TotalHits = 0 then 0
+        else (isnull([Уражено], 0) * 100.00/ TotalHits)
+    end,4) N''KPI''
+from
+(
+    select
+        p.name as PilotName,
+        r.id   as ResultId,
+        rs.name as ReasonName
+    from results r
+    left join pilot         p  on p.id  = r.pilot_id
+    left join flying_result rs on rs.id = r.flying_result_id
+    where r.Date between ''2026-03-01'' and ''2026-03-31''
+) src
+pivot
+(
+    count(ResultId) 
+    for ReasonName in (' + @colls + ')
+) p
+cross apply (
+    select
+        count(*) as TotalHits
+    from results rf
+    where rf.pilot_id = (
+        select top(1) id
+        from pilot
+        where name = p.PilotName
+    ) 
+      and rf.Date between ''2026-03-01'' and ''2026-03-31''
+) t;
+';
+
+exec sp_executesql @sql;
+";
+
+        try
+        {
+            using var db = new Data.AppDbContext();
+            var conn = db.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+                conn.Open();
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            using var reader = cmd.ExecuteReader();
+            var dt = new DataTable();
+            dt.Load(reader);
+
+            var reportWindow = new WeaponsReportWindow(dt) { Owner = this };
+            reportWindow.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                Data.DbHealth.IsDatabaseAvailable()
+                    ? ex.Message
+                    : Data.DbHealth.GetUnavailableMessage(),
+                "Помилка звіту",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void SimpleReportMenuItem_Click(object sender, RoutedEventArgs e)

@@ -9,6 +9,10 @@
             <MenuItem Header="Файл">
                 <MenuItem Header="Вихід" Click="ExitMenuItem_Click"/>
             </MenuItem>
+            <MenuItem Header="'Аналітика'">
+                <MenuItem Header="По засобам" Click="WeaponsReportMenuItem_Click"/>
+                <MenuItem Header="По пілотам" Click="PilotsReportMenuItem_Click"/>
+            </MenuItem>
             <MenuItem x:Name="AdminMenuItem" Header="Коригування довідників" Visibility="Collapsed">
                 <MenuItem Header="Пілоти" Click="PilotsMenuItem_Click"/>
                 <MenuItem Header="Засоби" Click="WeaponsMenuItem_Click"/>
