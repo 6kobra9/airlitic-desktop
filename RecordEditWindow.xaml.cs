@@ -28,7 +28,7 @@ public partial class RecordEditWindow : Window
 
         if (_record != null)
         {
-            DatePicker.SelectedDate = _record.Date;
+            DatePicker.Value = _record.Date;
             if (_record.Time is TimeSpan t)
             {
                 TimePickerControl.Value = DateTime.Today.Add(t);
@@ -48,7 +48,7 @@ public partial class RecordEditWindow : Window
         }
         else
         {
-            DatePicker.SelectedDate = DateTime.Today;
+            DatePicker.Value = DateTime.Today;
             Title = "Новий запис";
             ReasonComboBox.IsEnabled = false;
             SubreasonLostDroneComboBox.IsEnabled = false;
@@ -60,7 +60,7 @@ public partial class RecordEditWindow : Window
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
     {
-        if (DatePicker.SelectedDate == null)
+        if (DatePicker.Value == null)
         {
             MessageBox.Show("Вкажіть дату.", "Помилка", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
@@ -85,7 +85,7 @@ public partial class RecordEditWindow : Window
         {
             var newRecord = new Models.Record
             {
-                Date = DatePicker.SelectedDate.Value,
+                Date = DatePicker.Value!.Value.Date,
                 Time = time,
                 PilotId = pilotId,
                 WeaponId = weaponId,
@@ -104,7 +104,7 @@ public partial class RecordEditWindow : Window
             var entity = db.Records.Find(_record.Id);
             if (entity != null)
             {
-                entity.Date = DatePicker.SelectedDate.Value;
+                entity.Date = DatePicker.Value!.Value.Date;
                 entity.Time = time;
                 entity.PilotId = pilotId;
                 entity.WeaponId = weaponId;

@@ -16,6 +16,12 @@ public partial class AddUserWindow : Window
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
+        if (!Data.DbHealth.IsDatabaseAvailable())
+        {
+            ErrorText.Text = Data.DbHealth.GetUnavailableMessage();
+            return;
+        }
+
         var login = LoginTextBox.Text.Trim();
         var password = PasswordBox.Password;
         var role = RoleComboBox.SelectedItem as string ?? "Viewer";
@@ -32,23 +38,31 @@ public partial class AddUserWindow : Window
             return;
         }
 
-        using var db = new Data.AppDbContext();
-
-        if (db.Users.Any(u => u.Login == login))
+        try
         {
-            ErrorText.Text = "Користувач з таким логіном вже існує.";
+            using var db = new Data.AppDbContext();
+
+            if (db.Users.Any(u => u.Login == login))
+            {
+                ErrorText.Text = "Користувач з таким логіном вже існує.";
+                return;
+            }
+
+            var user = new Models.User
+            {
+                Login = login,
+                PasswordHash = ComputeSha256(password),
+                Role = role
+            };
+
+            db.Users.Add(user);
+            db.SaveChanges();
+        }
+        catch
+        {
+            ErrorText.Text = Data.DbHealth.GetUnavailableMessage();
             return;
         }
-
-        var user = new Models.User
-        {
-            Login = login,
-            PasswordHash = ComputeSha256(password),
-            Role = role
-        };
-
-        db.Users.Add(user);
-        db.SaveChanges();
 
         DialogResult = true;
         Close();

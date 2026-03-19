@@ -31,49 +31,58 @@ public partial class MainWindow : Window
     private void LoadRecords()
     {
         _records.Clear();
-        using var db = new Data.AppDbContext();
-        var pilots = db.Pilots.ToDictionary(p => p.Id, p => p.Name);
-        var weapons = db.Weapons.ToDictionary(w => w.Id, w => w.Name);
-        var flyingResults = db.FlyingResults.ToDictionary(f => f.Id, f => f.Name);
-        var reasons = db.Reasons.ToDictionary(r => r.Id, r => r.Name);
-        var subreasons = db.SubreasonLostDrones.ToDictionary(s => s.Id, s => s.Name);
-        var subreasonTeches = db.SubreasonTeches.ToDictionary(s => s.Id, s => s.Name);
 
-        foreach (var record in db.Records.OrderBy(r => r.Date))
+        try
         {
-            if (record.PilotId.HasValue && pilots.TryGetValue(record.PilotId.Value, out var pName))
-                record.PilotName = pName;
-            else
-                record.PilotName = null;
+            using var db = new Data.AppDbContext();
+            var pilots = db.Pilots.ToDictionary(p => p.Id, p => p.Name);
+            var weapons = db.Weapons.ToDictionary(w => w.Id, w => w.Name);
+            var flyingResults = db.FlyingResults.ToDictionary(f => f.Id, f => f.Name);
+            var reasons = db.Reasons.ToDictionary(r => r.Id, r => r.Name);
+            var subreasons = db.SubreasonLostDrones.ToDictionary(s => s.Id, s => s.Name);
+            var subreasonTeches = db.SubreasonTeches.ToDictionary(s => s.Id, s => s.Name);
 
-            if (record.WeaponId.HasValue && weapons.TryGetValue(record.WeaponId.Value, out var wName))
-                record.WeaponName = wName;
-            else
-                record.WeaponName = null;
+            foreach (var record in db.Records.OrderBy(r => r.Date))
+            {
+                if (record.PilotId.HasValue && pilots.TryGetValue(record.PilotId.Value, out var pName))
+                    record.PilotName = pName;
+                else
+                    record.PilotName = null;
 
-            if (record.FlyingResultId.HasValue && flyingResults.TryGetValue(record.FlyingResultId.Value, out var frName))
-                record.FlyingResultName = frName;
-            else
-                record.FlyingResultName = null;
+                if (record.WeaponId.HasValue && weapons.TryGetValue(record.WeaponId.Value, out var wName))
+                    record.WeaponName = wName;
+                else
+                    record.WeaponName = null;
 
-            if (record.ReasonId.HasValue && reasons.TryGetValue(record.ReasonId.Value, out var rName))
-                record.ReasonName = rName;
-            else
-                record.ReasonName = null;
+                if (record.FlyingResultId.HasValue && flyingResults.TryGetValue(record.FlyingResultId.Value, out var frName))
+                    record.FlyingResultName = frName;
+                else
+                    record.FlyingResultName = null;
 
-            if (record.SubreasonLostDroneId.HasValue &&
-                subreasons.TryGetValue(record.SubreasonLostDroneId.Value, out var srName))
-                record.SubreasonLostDroneName = srName;
-            else
-                record.SubreasonLostDroneName = null;
+                if (record.ReasonId.HasValue && reasons.TryGetValue(record.ReasonId.Value, out var rName))
+                    record.ReasonName = rName;
+                else
+                    record.ReasonName = null;
 
-            if (record.SubreasonTechId.HasValue &&
-                subreasonTeches.TryGetValue(record.SubreasonTechId.Value, out var stName))
-                record.SubreasonTechName = stName;
-            else
-                record.SubreasonTechName = null;
+                if (record.SubreasonLostDroneId.HasValue &&
+                    subreasons.TryGetValue(record.SubreasonLostDroneId.Value, out var srName))
+                    record.SubreasonLostDroneName = srName;
+                else
+                    record.SubreasonLostDroneName = null;
 
-            _records.Add(record);
+                if (record.SubreasonTechId.HasValue &&
+                    subreasonTeches.TryGetValue(record.SubreasonTechId.Value, out var stName))
+                    record.SubreasonTechName = stName;
+                else
+                    record.SubreasonTechName = null;
+
+                _records.Add(record);
+            }
+        }
+        catch
+        {
+            MessageBox.Show(Data.DbHealth.GetUnavailableMessage(), "Помилка", MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
     }
 

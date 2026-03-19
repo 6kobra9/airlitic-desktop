@@ -10,10 +10,30 @@ public partial class LoginWindow : Window
     public LoginWindow()
     {
         InitializeComponent();
+        UpdateDbAvailabilityUi();
+    }
+
+    private void UpdateDbAvailabilityUi()
+    {
+        var available = Data.DbHealth.IsDatabaseAvailable();
+        if (!available)
+        {
+            ErrorText.Text = Data.DbHealth.GetUnavailableMessage();
+        }
+
+        LoginButton.IsEnabled = available;
+        LoginTextBox.IsEnabled = available;
+        PasswordBox.IsEnabled = available;
     }
 
     private void LoginButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!Data.DbHealth.IsDatabaseAvailable())
+        {
+            UpdateDbAvailabilityUi();
+            return;
+        }
+
         var login = LoginTextBox.Text.Trim();
         var password = PasswordBox.Password;
 
@@ -40,9 +60,9 @@ public partial class LoginWindow : Window
             mainWindow.Show();
             Close();
         }
-        catch (System.Exception ex)
+        catch
         {
-            ErrorText.Text = $"Помилка підключення до БД: {ex.Message}";
+            ErrorText.Text = Data.DbHealth.GetUnavailableMessage();
         }
     }
 

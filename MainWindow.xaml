@@ -2,7 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="AirLitic - Робоче вікно" Height="450" Width="800"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/Resources/app-icon.ico">
     <DockPanel>
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="Файл">
@@ -33,7 +34,7 @@
                                         Width="*" />
                     <DataGridTextColumn Header="Час" Binding="{Binding Time}" Width="*" />
                     <DataGridTextColumn Header="Пілот" Binding="{Binding PilotName}" Width="*" />
-                    <DataGridTextColumn Header="Озброєння" Binding="{Binding WeaponName}" Width="*" />
+                    <DataGridTextColumn Header="Засіб" Binding="{Binding WeaponName}" Width="*" />
                     <DataGridTextColumn Header="Результат польоту" Binding="{Binding FlyingResultName}" Width="*" />
                     <DataGridTextColumn Header="Причина" Binding="{Binding ReasonName}" Width="*" />
                     <DataGridTextColumn Header="Причина втрати" Binding="{Binding SubreasonLostDroneName}" Width="*" />

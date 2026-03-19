@@ -20,30 +20,39 @@ public partial class SimpleDictionaryWindow : Window
     private void LoadData()
     {
         _rows.Clear();
-        using var db = new Data.AppDbContext();
-
-        switch (_kind)
+        try
         {
-            case SimpleDictionaryKind.Pilots:
-                Title = "Пілоти";
-                foreach (var x in db.Pilots.OrderBy(p => p.Name))
-                    _rows.Add(new Row { Id = x.Id, Name = x.Name });
-                break;
-            case SimpleDictionaryKind.Weapons:
-                Title = "Засоби";
-                foreach (var x in db.Weapons.OrderBy(w => w.Name))
-                    _rows.Add(new Row { Id = x.Id, Name = x.Name });
-                break;
-            case SimpleDictionaryKind.SubreasonLostDrone:
-                Title = "Причина втрати";
-                foreach (var x in db.SubreasonLostDrones.OrderBy(s => s.Name))
-                    _rows.Add(new Row { Id = x.Id, Name = x.Name });
-                break;
-            case SimpleDictionaryKind.SubreasonTech:
-                Title = "Технічні проблеми";
-                foreach (var x in db.SubreasonTeches.OrderBy(s => s.Name))
-                    _rows.Add(new Row { Id = x.Id, Name = x.Name });
-                break;
+            using var db = new Data.AppDbContext();
+
+            switch (_kind)
+            {
+                case SimpleDictionaryKind.Pilots:
+                    Title = "Пілоти";
+                    foreach (var x in db.Pilots.OrderBy(p => p.Name))
+                        _rows.Add(new Row { Id = x.Id, Name = x.Name });
+                    break;
+                case SimpleDictionaryKind.Weapons:
+                    Title = "Засоби";
+                    foreach (var x in db.Weapons.OrderBy(w => w.Name))
+                        _rows.Add(new Row { Id = x.Id, Name = x.Name });
+                    break;
+                case SimpleDictionaryKind.SubreasonLostDrone:
+                    Title = "Причина втрати";
+                    foreach (var x in db.SubreasonLostDrones.OrderBy(s => s.Name))
+                        _rows.Add(new Row { Id = x.Id, Name = x.Name });
+                    break;
+                case SimpleDictionaryKind.SubreasonTech:
+                    Title = "Технічні проблеми";
+                    foreach (var x in db.SubreasonTeches.OrderBy(s => s.Name))
+                        _rows.Add(new Row { Id = x.Id, Name = x.Name });
+                    break;
+            }
+        }
+        catch
+        {
+            MessageBox.Show(Data.DbHealth.GetUnavailableMessage(), "Помилка", MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            Close();
         }
     }
 
@@ -64,31 +73,46 @@ public partial class SimpleDictionaryWindow : Window
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
+        if (!Data.DbHealth.IsDatabaseAvailable())
+        {
+            MessageBox.Show(Data.DbHealth.GetUnavailableMessage(), "Помилка", MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
         var cleaned = _rows
             .Select(r => new Row { Id = r.Id, Name = (r.Name ?? "").Trim() })
             .Where(r => !string.IsNullOrWhiteSpace(r.Name))
             .ToList();
 
-        using var db = new Data.AppDbContext();
-
-        switch (_kind)
+        try
         {
-            case SimpleDictionaryKind.Pilots:
-                SavePilots(db, cleaned);
-                break;
-            case SimpleDictionaryKind.Weapons:
-                SaveWeapons(db, cleaned);
-                break;
-            case SimpleDictionaryKind.SubreasonLostDrone:
-                SaveSubreasonLostDrone(db, cleaned);
-                break;
-            case SimpleDictionaryKind.SubreasonTech:
-                SaveSubreasonTech(db, cleaned);
-                break;
-        }
+            using var db = new Data.AppDbContext();
 
-        db.SaveChanges();
-        LoadData();
+            switch (_kind)
+            {
+                case SimpleDictionaryKind.Pilots:
+                    SavePilots(db, cleaned);
+                    break;
+                case SimpleDictionaryKind.Weapons:
+                    SaveWeapons(db, cleaned);
+                    break;
+                case SimpleDictionaryKind.SubreasonLostDrone:
+                    SaveSubreasonLostDrone(db, cleaned);
+                    break;
+                case SimpleDictionaryKind.SubreasonTech:
+                    SaveSubreasonTech(db, cleaned);
+                    break;
+            }
+
+            db.SaveChanges();
+            LoadData();
+        }
+        catch
+        {
+            MessageBox.Show(Data.DbHealth.GetUnavailableMessage(), "Помилка", MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private static void SavePilots(Data.AppDbContext db, System.Collections.Generic.List<Row> rows)

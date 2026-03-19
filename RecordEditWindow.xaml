@@ -39,7 +39,11 @@
         </Grid.ColumnDefinitions>
 
         <TextBlock Text="Дата:" Style="{StaticResource LabelStyle}"/>
-        <DatePicker x:Name="DatePicker" Grid.Column="1" Style="{StaticResource InputControlStyle}"/>
+        <xctk:DateTimePicker x:Name="DatePicker"
+                             Grid.Column="1"
+                             Style="{StaticResource InputControlStyle}"
+                             Format="ShortDate"
+                             TimePickerVisibility="Collapsed"/>
 
         <TextBlock Grid.Row="1" Text="Час:" Style="{StaticResource LabelStyle}"/>
         <xctk:TimePicker x:Name="TimePickerControl"

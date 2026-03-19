@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Вхід до системи" Height="220" Width="360"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        Icon="pack://application:,,,/Resources/app-icon.ico">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -25,7 +26,7 @@
         <TextBlock Grid.Row="2" Grid.ColumnSpan="2" x:Name="ErrorText"
                    Foreground="Red" Margin="0,0,0,10" TextWrapping="Wrap"/>
 
-        <Button Grid.Row="3" Grid.ColumnSpan="2" Content="Увійти" Width="100" Height="30"
+        <Button x:Name="LoginButton" Grid.Row="3" Grid.ColumnSpan="2" Content="Увійти" Width="100" Height="30"
                 HorizontalAlignment="Right"
                 IsDefault="True"
                 Click="LoginButton_Click"/>
