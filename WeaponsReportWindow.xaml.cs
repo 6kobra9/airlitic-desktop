@@ -13,6 +13,7 @@ public partial class WeaponsReportWindow : Window
 {
     public ObservableCollection<BarItem> MainChartItems { get; } = new();
     public ObservableCollection<BarItem> LostChartItems { get; } = new();
+    public ObservableCollection<StackBarItem> MainStackItems { get; } = new();
 
     private ChartType _mainChartType = ChartType.Bar;
     private ChartType _lostChartType = ChartType.Bar;
@@ -24,6 +25,7 @@ public partial class WeaponsReportWindow : Window
 
         ReportGrid.ItemsSource = mainReport.DefaultView;
         BuildMainChart(mainReport);
+        BuildMainStackChart(mainReport);
         _mainChartType = FromComboIndex(MainChartTypeCombo?.SelectedIndex ?? 0);
         try
         {
@@ -31,8 +33,6 @@ public partial class WeaponsReportWindow : Window
         }
         catch
         {
-            // В случае проблем с графиком — не ломаем весь отчет.
-            // Таблица должна остаться видимой.
         }
 
         if (lostReport != null)
@@ -77,6 +77,108 @@ public partial class WeaponsReportWindow : Window
         }
     }
 
+    private void BuildMainStackChart(DataTable table)
+    {
+        MainStackItems.Clear();
+
+        var totalCol =
+            table.Columns.Contains("Кіл-ть вильотів")
+                ? "Кіл-ть вильотів"
+                : table.Columns.Contains("TotalHits")
+                    ? "TotalHits"
+                    : null;
+
+        if (totalCol == null)
+        {
+            foreach (DataColumn col in table.Columns)
+            {
+                var n = col.ColumnName;
+                if (n.Contains("Кіл", StringComparison.OrdinalIgnoreCase) &&
+                    n.Contains("виль", StringComparison.OrdinalIgnoreCase))
+                {
+                    totalCol = n;
+                    break;
+                }
+            }
+        }
+
+        if (totalCol == null)
+            return;
+
+        string? hitsCol = null;
+        string? missesCol = null;
+        foreach (DataColumn col in table.Columns)
+        {
+            var n = col.ColumnName;
+            var hasUraz = n.Contains("Ураж", StringComparison.OrdinalIgnoreCase);
+            var hasNe = n.Contains("Не", StringComparison.OrdinalIgnoreCase);
+
+            if (hasUraz && hasNe)
+                missesCol ??= n;
+            else if (hasUraz && !hasNe)
+                hitsCol ??= n;
+
+            // Точная подстановка, если вдруг совпало
+            if (n == "Уражено")
+                hitsCol = n;
+            if (n == "Не уражено" || n == "Не уражент")
+                missesCol = n;
+        }
+
+        if (hitsCol == null || missesCol == null)
+            return;
+
+        double maxTotal = 0d;
+        foreach (DataRow row in table.Rows)
+        {
+            var total = TryGetDouble(row[totalCol]);
+            if (total > maxTotal) maxTotal = total;
+        }
+
+        if (maxTotal <= 0)
+            return;
+
+        foreach (DataRow row in table.Rows)
+        {
+            var label = row[0]?.ToString() ?? string.Empty;
+            var total = TryGetDouble(row[totalCol]);
+            var hits = TryGetDouble(row[hitsCol]);
+            var misses = TryGetDouble(row[missesCol]);
+
+            var totalPercent = total / maxTotal * 100d;
+            var hitsPercent = hits / maxTotal * 100d;
+            var missesPercent = misses / maxTotal * 100d;
+
+            MainStackItems.Add(new StackBarItem
+            {
+                Label = label,
+                TotalCount = total,
+                HitsCount = hits,
+                MissesCount = misses,
+                TotalPercent = totalPercent,
+                HitsPercent = hitsPercent,
+                MissesPercent = missesPercent
+            });
+        }
+    }
+
+    private static double TryGetDouble(object? value)
+    {
+        if (value == null || value == DBNull.Value)
+            return 0d;
+        return value switch
+        {
+            double d => d,
+            float f => f,
+            decimal m => (double)m,
+            int i => i,
+            long l => l,
+            short s => s,
+            byte b => b,
+            _ => Convert.ToDouble(value, CultureInfo.InvariantCulture)
+        };
+    }
+
     private void BuildLostChart(DataTable table)
     {
         LostChartItems.Clear();
@@ -85,8 +187,13 @@ public partial class WeaponsReportWindow : Window
         // Считаем "общий" KPI как взвешенное среднее по TotalHits:
         // KPI_total = sum(KPI_i * TotalHits_i) / sum(TotalHits_i)
 
-        const string totalHitsColumn = "TotalHits";
-        if (!table.Columns.Contains(totalHitsColumn))
+        var totalHitsColumn = table.Columns.Contains("TotalHits")
+            ? "TotalHits"
+            : table.Columns.Contains("Кіл-ть невдалих вильотів")
+                ? "Кіл-ть невдалих вильотів"
+                : null;
+
+        if (totalHitsColumn == null)
             return;
 
         var totalHitsSum = 0d;
@@ -222,7 +329,7 @@ public partial class WeaponsReportWindow : Window
         MainPieCanvas.Visibility = _mainChartType == ChartType.Pie ? Visibility.Visible : Visibility.Collapsed;
 
         if (_mainChartType == ChartType.Line)
-            DrawLineChart(MainLineCanvas, MainChartItems, Brushes.SteelBlue);
+            DrawLineChart(MainLineCanvas, MainChartItems, Brushes.SteelBlue, cumulative: true);
         else
             DrawPieChart(MainPieCanvas, MainChartItems);
     }
@@ -245,12 +352,12 @@ public partial class WeaponsReportWindow : Window
         LostPieCanvas.Visibility = _lostChartType == ChartType.Pie ? Visibility.Visible : Visibility.Collapsed;
 
         if (_lostChartType == ChartType.Line)
-            DrawLineChart(LostLineCanvas, LostChartItems, Brushes.DarkOrange);
+            DrawLineChart(LostLineCanvas, LostChartItems, Brushes.DarkOrange, cumulative: true);
         else
             DrawPieChart(LostPieCanvas, LostChartItems);
     }
 
-    private static void DrawLineChart(Canvas canvas, ObservableCollection<BarItem> items, Brush lineBrush)
+    private static void DrawLineChart(Canvas canvas, ObservableCollection<BarItem> items, Brush lineBrush, bool cumulative)
     {
         canvas.Children.Clear();
 
@@ -269,12 +376,22 @@ public partial class WeaponsReportWindow : Window
         var plotWidth = Math.Max(10, width - padding * 2);
         var plotHeight = Math.Max(10, height - padding * 2 - 10);
 
+        // Накопление: y[i] = sum(y[0..i]).
+        var yValues = new double[items.Count];
+        var running = 0d;
+        for (int i = 0; i < items.Count; i++)
+        {
+            running = cumulative ? running + items[i].Value : items[i].Value;
+            yValues[i] = running;
+        }
+
         var max = 0d;
-        foreach (var it in items)
-            if (it.Value > max) max = it.Value;
+        foreach (var v in yValues)
+            if (v > max) max = v;
         if (max <= 0) max = 1d;
 
-        var points = new PointCollection();
+        // Предварительно посчитаем x-координаты точек.
+        var xValues = new double[items.Count];
         for (int i = 0; i < items.Count; i++)
         {
             var x = padding;
@@ -282,9 +399,21 @@ public partial class WeaponsReportWindow : Window
                 x += i * (plotWidth / (items.Count - 1));
             else
                 x += plotWidth / 2;
+            xValues[i] = x;
+        }
 
-            var y = padding + plotHeight * (1 - items[i].Value / max);
-            points.Add(new Point(x, y));
+        // Преобразуем y-значения в координаты и рисуем "ступенчатую" (линейчастую) линию.
+        var yCoords = new double[items.Count];
+        for (int i = 0; i < items.Count; i++)
+            yCoords[i] = padding + plotHeight * (1 - yValues[i] / max);
+
+        // Ступеньки: (x0,y0) -> (x1,y0) -> (x1,y1) -> (x2,y1) -> (x2,y2) ...
+        var points = new PointCollection();
+        points.Add(new Point(xValues[0], yCoords[0]));
+        for (int i = 1; i < items.Count; i++)
+        {
+            points.Add(new Point(xValues[i], yCoords[i - 1]));
+            points.Add(new Point(xValues[i], yCoords[i]));
         }
 
         var poly = new Polyline
@@ -297,8 +426,8 @@ public partial class WeaponsReportWindow : Window
 
         for (int i = 0; i < items.Count; i++)
         {
-            var x = points[i].X;
-            var y = points[i].Y;
+            var x = xValues[i];
+            var y = yCoords[i];
 
             var dot = new Ellipse
             {
@@ -314,7 +443,8 @@ public partial class WeaponsReportWindow : Window
 
             var valueText = new TextBlock
             {
-                Text = items[i].Value.ToString("F2", CultureInfo.InvariantCulture),
+                // Подписываем накопленное значение (или обычное, если cumulative=false).
+                Text = yValues[i].ToString("F2", CultureInfo.InvariantCulture),
                 FontSize = 10,
                 Foreground = Brushes.Black
             };
@@ -459,5 +589,19 @@ public partial class WeaponsReportWindow : Window
     {
         public string Label { get; set; } = string.Empty;
         public double Value { get; set; }
+    }
+
+    public class StackBarItem
+    {
+        public string Label { get; set; } = string.Empty;
+
+        public double TotalCount { get; set; }
+        public double HitsCount { get; set; }
+        public double MissesCount { get; set; }
+
+        // Проценты относительно максимального значения TotalCount
+        public double TotalPercent { get; set; }
+        public double HitsPercent { get; set; }
+        public double MissesPercent { get; set; }
     }
 }
