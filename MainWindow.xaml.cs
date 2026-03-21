@@ -138,34 +138,57 @@ public partial class MainWindow : Window
     private void WeaponsReportMenuItem_Click(object sender, RoutedEventArgs e)
     {
         const string mainSql = @"
+-- Пивот по flying_result_id (стабильно), заголовки колонок — имена из справочника.
+-- Так избегаем пустых ячеек из-за несовпадения текста (пробелы, другая буква и т.п.).
 declare @colls nvarchar(max);
-select @colls = string_agg(quotename(flying_result.name), ',')
+declare @collsSelect nvarchar(max);
+declare @hitBracket nvarchar(40);
+
+select @colls = string_agg(quotename(cast(id as nvarchar(20))), ',') within group (order by id)
 from flying_result;
+
+select @collsSelect = string_agg(
+    'isnull(' + quotename(cast(id as nvarchar(20))) + ',0) as ' + quotename(name),
+    ',') within group (order by id)
+from flying_result;
+
+select top(1) @hitBracket = quotename(cast(id as nvarchar(20)))
+from flying_result
+where name = N'Уражено';
+
+if @hitBracket is null
+    select top(1) @hitBracket = quotename(cast(id as nvarchar(20)))
+    from flying_result
+    where name like N'%Ураж%' and name not like N'%Не%'
+    order by id;
+
+if @hitBracket is null
+    set @hitBracket = N'[1]';
 
 declare @sql nvarchar(max) = N'
 select
     weaponName N''Засіб'',
     TotalHits N''Кіл-ть вильотів'',
-    ' + @colls + ',
+    ' + @collsSelect + ',
     case
         when TotalHits = 0 then 0
-        else round(isnull([Уражено], 0) * 100 / TotalHits,2)
+        else round(isnull(' + @hitBracket + ', 0) * 100.0 / TotalHits, 2)
     end N''KPI''
 from
 (
     select
         p.name as weaponName,
         r.id   as ResultId,
-        rs.name as ReasonName
+        r.flying_result_id as ResultKey
     from results r
-    left join weapon         p  on p.id  = r.weapon_id
-    left join flying_result rs on rs.id = r.flying_result_id
+    left join weapon p on p.id = r.weapon_id
     where r.Date between ''2026-03-01'' and ''2026-03-31''
+      and r.flying_result_id is not null
 ) src
 pivot
 (
     count(ResultId)
-    for ReasonName in (' + @colls + ')
+    for ResultKey in (' + @colls + ')
 ) p
 cross apply (
     select
