@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using Microsoft.EntityFrameworkCore;
@@ -135,77 +136,84 @@ public partial class MainWindow : Window
         Close();
     }
 
+    private const string ReportDateFromPlaceholder = "{{RPT_DF}}";
+    private const string ReportDateToPlaceholder = "{{RPT_DT}}";
+
+    private static string FormatReportSqlDates(string sqlTemplate, DateTime from, DateTime to)
+    {
+        var df = from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var dt = to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        return sqlTemplate
+            .Replace(ReportDateFromPlaceholder, df, StringComparison.Ordinal)
+            .Replace(ReportDateToPlaceholder, dt, StringComparison.Ordinal);
+    }
+
+    private bool TryPickReportPeriod(out DateTime from, out DateTime to)
+    {
+        var dlg = new ReportPeriodWindow { Owner = this };
+        if (dlg.ShowDialog() != true)
+        {
+            from = to = default;
+            return false;
+        }
+
+        from = dlg.PeriodFrom;
+        to = dlg.PeriodTo;
+        return true;
+    }
+
     private void WeaponsReportMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        const string mainSql = @"
--- Пивот по flying_result_id (стабильно), заголовки колонок — имена из справочника.
--- Так избегаем пустых ячеек из-за несовпадения текста (пробелы, другая буква и т.п.).
+        if (!TryPickReportPeriod(out var periodFrom, out var periodTo))
+            return;
+
+        const string mainSqlTemplate = @"
 declare @colls nvarchar(max);
-declare @collsSelect nvarchar(max);
-declare @hitBracket nvarchar(40);
 
-select @colls = string_agg(quotename(cast(id as nvarchar(20))), ',') within group (order by id)
+select @colls = string_agg(quotename(flying_result.name), ',')
 from flying_result;
-
-select @collsSelect = string_agg(
-    'isnull(' + quotename(cast(id as nvarchar(20))) + ',0) as ' + quotename(name),
-    ',') within group (order by id)
-from flying_result;
-
-select top(1) @hitBracket = quotename(cast(id as nvarchar(20)))
-from flying_result
-where name = N'Уражено';
-
-if @hitBracket is null
-    select top(1) @hitBracket = quotename(cast(id as nvarchar(20)))
-    from flying_result
-    where name like N'%Ураж%' and name not like N'%Не%'
-    order by id;
-
-if @hitBracket is null
-    set @hitBracket = N'[1]';
 
 declare @sql nvarchar(max) = N'
 select
     weaponName N''Засіб'',
     TotalHits N''Кіл-ть вильотів'',
-    ' + @collsSelect + ',
+    ' + @colls + ',
     case
         when TotalHits = 0 then 0
-        else round(isnull(' + @hitBracket + ', 0) * 100.0 / TotalHits, 2)
+        else round(isnull([Уражено], 0) * 100.0 / TotalHits, 2)
     end N''KPI''
 from
 (
     select
         p.name as weaponName,
-        r.id   as ResultId,
-        r.flying_result_id as ResultKey
+        r.id as ResultId,
+        rs.name as ReasonName
     from results r
     left join weapon p on p.id = r.weapon_id
-    where r.Date between ''2026-03-01'' and ''2026-03-31''
-      and r.flying_result_id is not null
+    left join flying_result rs on rs.id = r.flying_result_id
+    where r.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
 ) src
 pivot
 (
     count(ResultId)
-    for ResultKey in (' + @colls + ')
+    for ReasonName in (' + @colls + ')
 ) p
 cross apply (
-    select
-        count(*) as TotalHits
+    select count(*) as TotalHits
     from results rf
     where rf.weapon_id = (
         select top(1) id
         from weapon
         where name = p.weaponName
     )
-      and rf.Date between ''2026-03-01'' and ''2026-03-31''
+      and rf.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
 ) t;
 ';
+
 exec sp_executesql @sql;
 ";
 
-        const string lostSql = @"
+        const string lostSqlTemplate = @"
 declare @colls nvarchar(max);
 
 select @colls = string_agg(quotename(name), ',')
@@ -249,7 +257,7 @@ from
 from results r
 left join weapon wp on wp.id =weapon_id
 left join subreason_lost_drone sld on sld.id=r.subreason_lost_drone_id
-where flying_result_id=2 and r.Date between ''2026-03-01'' and ''2026-03-31''
+where flying_result_id=2 and r.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
 ) src
 pivot
 (
@@ -264,13 +272,16 @@ cross apply (
         select top(1) id
         from weapon
         where name = p.weaponName
-    ) 
-      and rf.Date between ''2026-03-01'' and ''2026-03-31''
+    ) and flying_result_id=2 
+      and rf.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
 ) t;
 ';
 
 exec sp_executesql @sql;
 ";
+
+        var mainSql = FormatReportSqlDates(mainSqlTemplate, periodFrom, periodTo);
+        var lostSql = FormatReportSqlDates(lostSqlTemplate, periodFrom, periodTo);
 
         try
         {
@@ -292,6 +303,8 @@ exec sp_executesql @sql;
             lostTable.Load(reader2);
 
             var reportWindow = new WeaponsReportWindow(mainTable, lostTable) { Owner = this };
+            reportWindow.Title =
+                $"Звіт по засобам ({periodFrom:dd.MM.yyyy} — {periodTo:dd.MM.yyyy})";
             reportWindow.ShowDialog();
         }
         catch (Exception ex)
@@ -308,7 +321,10 @@ exec sp_executesql @sql;
 
     private void PilotsReportMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        const string sql = @"
+        if (!TryPickReportPeriod(out var periodFrom, out var periodTo))
+            return;
+
+        const string sqlTemplate = @"
 declare @colls nvarchar(max);
 
 select @colls = string_agg(quotename(flying_result.name), ',')
@@ -332,7 +348,7 @@ from
     from results r
     left join pilot         p  on p.id  = r.pilot_id
     left join flying_result rs on rs.id = r.flying_result_id
-    where r.Date between ''2026-03-01'' and ''2026-03-31''
+    where r.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
 ) src
 pivot
 (
@@ -348,12 +364,82 @@ cross apply (
         from pilot
         where name = p.PilotName
     ) 
-      and rf.Date between ''2026-03-01'' and ''2026-03-31''
+      and rf.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
 ) t;
 ';
 
 exec sp_executesql @sql;
 ";
+
+        const string pilotsLostSqlTemplate = @"
+declare @colls nvarchar(max);
+
+select @colls = string_agg(quotename(name), ',')
+from subreason_lost_drone;
+
+declare @sql nvarchar(max) = N'
+select
+    PilotName N''Пілот'',
+    TotalHits N''Кіл-ть невдалих вильотів'',
+    ' + @colls + ',
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([вороже збиття], 0) * 100 / TotalHits,2)
+    end N''KPI вороже збиття''  ,
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([реб противника], 0) * 100 / TotalHits,2)
+    end N''KPI реб противника''   ,
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([технічні помилки], 0) * 100 / TotalHits,2)
+    end N''KPI технічні помилки''  ,
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([погодні умови], 0) * 100 / TotalHits,2)
+    end N''KPI погодні умови'',
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([реб свій], 0) * 100 / TotalHits,2)
+    end N''KPI реб свій'',
+    case
+        when TotalHits = 0 then 0
+        else round(isnull([помилка пілота], 0) * 100 / TotalHits,2)
+    end N''KPI помилка пілота''
+from
+(
+    select
+        wp.name as PilotName,
+        r.id   as ResultId,
+        sld.name as ReasonName
+    from results r
+    left join pilot wp on wp.id = r.pilot_id
+    left join subreason_lost_drone sld on sld.id = r.subreason_lost_drone_id
+    where r.flying_result_id = 2 and r.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
+) src
+pivot
+(
+    count(ResultId)
+    for ReasonName in (' + @colls + ')
+) p
+cross apply (
+    select
+        count(*) as TotalHits
+    from results rf
+    where rf.pilot_id = (
+        select top(1) id
+        from pilot
+        where name = p.PilotName
+    ) and rf.flying_result_id = 2
+      and rf.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
+) t;
+';
+
+exec sp_executesql @sql;
+";
+
+        var sql = FormatReportSqlDates(sqlTemplate, periodFrom, periodTo);
+        var pilotsLostSql = FormatReportSqlDates(pilotsLostSqlTemplate, periodFrom, periodTo);
 
         try
         {
@@ -368,7 +454,14 @@ exec sp_executesql @sql;
             var dt = new DataTable();
             dt.Load(reader);
 
-            var reportWindow = new WeaponsReportWindow(dt) { Owner = this };
+            cmd.CommandText = pilotsLostSql;
+            using var readerLost = cmd.ExecuteReader();
+            var lostDt = new DataTable();
+            lostDt.Load(readerLost);
+
+            var reportWindow = new WeaponsReportWindow(dt, lostDt) { Owner = this };
+            reportWindow.Title =
+                $"Звіт по пілотах ({periodFrom:dd.MM.yyyy} — {periodTo:dd.MM.yyyy})";
             reportWindow.ShowDialog();
         }
         catch (Exception ex)

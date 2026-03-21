@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 
 namespace AirLiticApp;
@@ -19,11 +20,13 @@ public partial class WeaponsReportWindow : Window
         InitializeComponent();
         DataContext = this;
 
+        BindDataTableToGrid(ReportGrid, mainReport);
         ReportGrid.ItemsSource = mainReport.DefaultView;
         BuildMainStackChart(mainReport);
 
         if (lostReport != null)
         {
+            BindDataTableToGrid(LostReportGrid, lostReport);
             LostReportGrid.ItemsSource = lostReport.DefaultView;
             BuildLostChart(lostReport);
         }
@@ -33,9 +36,46 @@ public partial class WeaponsReportWindow : Window
         }
     }
 
+    /// <summary>
+    /// Явні колонки для DataTable.DefaultView: індексатор DataRowView [ім'я] — інакше колонки з пробілом
+    /// («Не уражено», «Кіл-ть вильотів») не показуються при AutoGenerateColumns.
+    /// </summary>
+    private static void BindDataTableToGrid(DataGrid grid, DataTable table)
+    {
+        grid.Columns.Clear();
+        foreach (DataColumn dc in table.Columns)
+        {
+            var escaped = dc.ColumnName.Replace("]", "]]", StringComparison.Ordinal);
+            var col = new DataGridTextColumn
+            {
+                Header = dc.ColumnName,
+                Binding = new Binding
+                {
+                    Path = new PropertyPath($"[{escaped}]"),
+                    Mode = BindingMode.OneWay
+                },
+                SortMemberPath = dc.ColumnName,
+                MinWidth = 48,
+                Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+            };
+            grid.Columns.Add(col);
+        }
+    }
+
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private static string NormalizeReportColumnHeader(string? name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return string.Empty;
+        return name
+            .Replace('\u00A0', ' ')
+            .Replace('\u202F', ' ')
+            .Replace('\u2009', ' ')
+            .Trim();
     }
 
     private void BuildMainStackChart(DataTable table)
@@ -71,18 +111,27 @@ public partial class WeaponsReportWindow : Window
         foreach (DataColumn col in table.Columns)
         {
             var n = col.ColumnName;
-            var hasUraz = n.Contains("Ураж", StringComparison.OrdinalIgnoreCase);
-            var hasNe = n.Contains("Не", StringComparison.OrdinalIgnoreCase);
-
-            if (hasUraz && hasNe)
-                missesCol ??= n;
-            else if (hasUraz && !hasNe)
-                hitsCol ??= n;
-
-            if (n == "Уражено")
+            var norm = NormalizeReportColumnHeader(n);
+            if (norm.Equals("Уражено", StringComparison.OrdinalIgnoreCase))
                 hitsCol = n;
-            if (n == "Не уражено" || n == "Не уражент")
+            if (norm.Equals("Не уражено", StringComparison.OrdinalIgnoreCase) ||
+                norm.Equals("Не уражент", StringComparison.OrdinalIgnoreCase))
                 missesCol = n;
+        }
+
+        if (hitsCol == null || missesCol == null)
+        {
+            foreach (DataColumn col in table.Columns)
+            {
+                var n = col.ColumnName;
+                var hasUraz = n.Contains("Ураж", StringComparison.OrdinalIgnoreCase);
+                var hasNe = n.Contains("Не", StringComparison.OrdinalIgnoreCase);
+
+                if (missesCol == null && hasUraz && hasNe)
+                    missesCol = n;
+                else if (hitsCol == null && hasUraz && !hasNe)
+                    hitsCol = n;
+            }
         }
 
         if (hitsCol == null || missesCol == null)

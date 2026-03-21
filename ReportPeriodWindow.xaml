@@ -1,0 +1,21 @@
+<Window x:Class="AirLiticApp.ReportPeriodWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Період звіту"
+        Height="Auto"
+        Width="360"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        ResizeMode="NoResize">
+    <StackPanel Margin="16">
+        <TextBlock Text="Оберіть діапазон дат для звіту (одна дата — вкажіть однакові «з» і «по»)." TextWrapping="Wrap" Margin="0,0,0,12"/>
+        <Label Content="Дата з:" Target="{Binding ElementName=FromDatePicker}"/>
+        <DatePicker x:Name="FromDatePicker" SelectedDateFormat="Short" Margin="0,0,0,10"/>
+        <Label Content="Дата по:" Target="{Binding ElementName=ToDatePicker}"/>
+        <DatePicker x:Name="ToDatePicker" SelectedDateFormat="Short" Margin="0,0,0,16"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="OK" Width="90" Margin="0,0,8,0" IsDefault="True" Click="OkButton_Click"/>
+            <Button Content="Скасувати" Width="100" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

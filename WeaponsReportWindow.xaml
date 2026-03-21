@@ -5,9 +5,11 @@
         Title="Звіт по засобам" Height="760" Width="980"
         WindowStartupLocation="CenterOwner">
     <Window.Resources>
+        <!-- Вертикальні стовпчики (якщо знадобиться): MaxHeight -->
         <local:DoubleToBarHeightConverter x:Key="BarHeightConverter" MaxHeight="280" />
-        <!-- Нижче MaxHeight, щоб під стовпчиком вмістилась підпис (KPI завжди сумуються до 100%) -->
-        <local:DoubleToBarHeightConverter x:Key="BarHeightConverterLost" MaxHeight="248" />
+        <!-- Горизонтальні смуги: той самий клас, MaxHeight = макс. ширина смуги (пікс.) -->
+        <local:DoubleToBarHeightConverter x:Key="BarWidthConverter" MaxHeight="360" />
+        <local:DoubleToBarHeightConverter x:Key="BarWidthConverterLost" MaxHeight="280" />
     </Window.Resources>
 
     <Grid Margin="12">
@@ -25,11 +27,11 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
-                    <GroupBox Header="Загальний звіт по засобам" Grid.Row="0" Margin="0,0,0,8">
+                    <GroupBox Header="Загальний звіт" Grid.Row="0" Margin="0,0,0,8">
                         <DockPanel Margin="0,4,0,0">
                             <DataGrid x:Name="ReportGrid"
                                       DockPanel.Dock="Top"
-                                      AutoGenerateColumns="True"
+                                      AutoGenerateColumns="False"
                                       IsReadOnly="True"
                                       Margin="0,0,0,8"/>
                         </DockPanel>
@@ -39,7 +41,7 @@
                         <DockPanel Margin="0,4,0,0">
                             <DataGrid x:Name="LostReportGrid"
                                       DockPanel.Dock="Top"
-                                      AutoGenerateColumns="True"
+                                      AutoGenerateColumns="False"
                                       IsReadOnly="True"
                                       Margin="0,0,0,8"/>
                         </DockPanel>
@@ -76,79 +78,98 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <!-- Стовпчатая диаграмма -->
-                            <ScrollViewer x:Name="MainBarChartPanel"
-                                          HorizontalScrollBarVisibility="Auto"
-                                          VerticalScrollBarVisibility="Disabled"
-                                          Height="280"
-                                          Margin="0,0,0,8">
-                                <ItemsControl ItemsSource="{Binding MainStackItems}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Margin="6,0" VerticalAlignment="Bottom">
-                                                <Grid Width="40"
-                                                      Height="{Binding TotalPercent, Converter={StaticResource BarHeightConverter}}">
-                                                    <!-- 1 цвет: общее кол-во вылетов (светло-голубой фон) -->
-                                                    <Border Background="#BFE3FF"
-                                                            Opacity="0.45"
-                                                            CornerRadius="2"/>
+                            <TextBlock DockPanel.Dock="Bottom"
+                                       Text="Довжина смуги — відносно найбільшої кількості вильотів"
+                                       FontSize="9"
+                                       Foreground="#666"
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"/>
 
-                                                    <!-- подпись Total на верхушке -->
-                                                    <TextBlock Text="{Binding TotalCount, StringFormat={}{0}}"
-                                                               HorizontalAlignment="Center"
-                                                               VerticalAlignment="Top"
+                            <!-- Горизонтальні смуги: підпис зліва, довжина ∼ вильоти -->
+                            <DockPanel LastChildFill="True">
+                                <TextBlock DockPanel.Dock="Left"
+                                           Text="Засіб"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Foreground="#245A7A"
+                                           VerticalAlignment="Top"
+                                           Margin="0,8,10,0"
+                                           TextWrapping="Wrap"
+                                           MaxWidth="72"/>
+                                <ScrollViewer x:Name="MainBarChartPanel"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              VerticalScrollBarVisibility="Auto"
+                                              MaxHeight="280"
+                                              Margin="0,0,0,0">
+                                    <ItemsControl ItemsSource="{Binding MainStackItems}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Vertical"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,3,0,3">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="120"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0"
+                                                               Text="{Binding Label}"
+                                                               VerticalAlignment="Center"
                                                                FontSize="10"
-                                                               Foreground="#245A7A"
-                                                               Margin="0,2,0,0"/>
-
-                                                    <!-- 2 цвет: ураження (снизу, более тёмный синий), 3 цвет: неуражень (сверху, светло-синий) -->
-                                                    <DockPanel VerticalAlignment="Bottom" LastChildFill="False">
-                                                        <!-- неуражень -->
-                                                        <Border DockPanel.Dock="Top"
-                                                                Height="{Binding MissesPercent, Converter={StaticResource BarHeightConverter}}"
-                                                                Background="#86BFF8"
-                                                                Opacity="0.95"
-                                                                CornerRadius="2,2,0,0">
-                                                            <TextBlock Text="{Binding MissesCount, StringFormat={}{0}}"
-                                                                       HorizontalAlignment="Center"
-                                                                       VerticalAlignment="Center"
-                                                                       FontSize="10"
-                                                                       Foreground="#0B3554"/>
-                                                        </Border>
-
-                                                        <!-- ураження -->
-                                                        <Border DockPanel.Dock="Bottom"
-                                                                Height="{Binding HitsPercent, Converter={StaticResource BarHeightConverter}}"
-                                                                Background="#3A7BD5"
-                                                                Opacity="0.95"
-                                                                CornerRadius="0,0,2,2">
-                                                            <TextBlock Text="{Binding HitsCount, StringFormat={}{0}}"
-                                                                       HorizontalAlignment="Center"
-                                                                       VerticalAlignment="Center"
-                                                                       FontSize="10"
-                                                                       Foreground="White"/>
-                                                        </Border>
-                                                    </DockPanel>
-                                                </Grid>
-
-                                                <StackPanel Margin="0,4,0,0">
-                                                    <TextBlock Text="{Binding Label}"
-                                                               TextAlignment="Center"
-                                                               Width="72"
-                                                               TextWrapping="NoWrap"
+                                                               TextWrapping="Wrap"
                                                                TextTrimming="CharacterEllipsis"
-                                                               FontSize="10"/>
-                                                </StackPanel>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
+                                                               Margin="0,0,8,0"/>
+                                                    <Grid Grid.Column="1"
+                                                          Height="30"
+                                                          Width="{Binding TotalPercent, Converter={StaticResource BarWidthConverter}}"
+                                                          HorizontalAlignment="Left"
+                                                          VerticalAlignment="Center">
+                                                        <Border Background="#BFE3FF"
+                                                                Opacity="0.45"
+                                                                CornerRadius="2"/>
+                                                        <StackPanel Orientation="Horizontal"
+                                                                    VerticalAlignment="Stretch"
+                                                                    HorizontalAlignment="Left"
+                                                                    Margin="0,3,0,3">
+                                                            <Border Width="{Binding HitsPercent, Converter={StaticResource BarWidthConverter}}"
+                                                                    Background="#3A7BD5"
+                                                                    Opacity="0.95"
+                                                                    CornerRadius="2,0,0,2"
+                                                                    MinWidth="0">
+                                                                <TextBlock Text="{Binding HitsCount, StringFormat={}{0}}"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center"
+                                                                           FontSize="9"
+                                                                           Foreground="White"/>
+                                                            </Border>
+                                                            <Border Width="{Binding MissesPercent, Converter={StaticResource BarWidthConverter}}"
+                                                                    Background="#86BFF8"
+                                                                    Opacity="0.95"
+                                                                    CornerRadius="0,2,2,0"
+                                                                    MinWidth="0">
+                                                                <TextBlock Text="{Binding MissesCount, StringFormat={}{0}}"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center"
+                                                                           FontSize="9"
+                                                                           Foreground="#0B3554"/>
+                                                            </Border>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{Binding TotalCount, StringFormat='Всього: {0}'}"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="9"
+                                                               Foreground="#245A7A"
+                                                               Margin="8,0,0,0"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </DockPanel>
                         </DockPanel>
                     </GroupBox>
 
@@ -186,43 +207,66 @@
                                 </StackPanel>
                             </StackPanel>
 
-                            <!-- Стовпчики: одна колонка на кожну причину (сума по всіх засобах) -->
-                            <ScrollViewer x:Name="LostBarChartPanel"
-                                          HorizontalScrollBarVisibility="Auto"
-                                          VerticalScrollBarVisibility="Disabled"
-                                          Height="305"
-                                          Margin="0,0,0,8">
-                                <ItemsControl ItemsSource="{Binding LostReasonItems}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Margin="8,0" VerticalAlignment="Bottom" MinWidth="76" MaxWidth="100">
-                                                <Border Width="40"
-                                                        HorizontalAlignment="Center"
-                                                        CornerRadius="2"
-                                                        Height="{Binding HeightPercent, Converter={StaticResource BarHeightConverterLost}}"
-                                                        Background="{Binding BarBrush}">
-                                                    <TextBlock Text="{Binding Count, StringFormat={}{0}}"
-                                                               HorizontalAlignment="Center"
+                            <TextBlock DockPanel.Dock="Bottom"
+                                       Text="Довжина смуги — відносно найбільшої причини"
+                                       FontSize="9"
+                                       Foreground="#666"
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"/>
+
+                            <DockPanel LastChildFill="True">
+                                <TextBlock DockPanel.Dock="Left"
+                                           Text="Причина"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Foreground="#245A7A"
+                                           VerticalAlignment="Top"
+                                           Margin="0,8,10,0"
+                                           TextWrapping="Wrap"
+                                           MaxWidth="72"/>
+                                <ScrollViewer x:Name="LostBarChartPanel"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              VerticalScrollBarVisibility="Auto"
+                                              MaxHeight="280"
+                                              Margin="0,0,0,0">
+                                    <ItemsControl ItemsSource="{Binding LostReasonItems}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Vertical"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,4,0,4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="140"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0"
+                                                               Text="{Binding Label}"
                                                                VerticalAlignment="Center"
                                                                FontSize="10"
-                                                               Foreground="{Binding CountForeground}"/>
-                                                </Border>
-                                                <TextBlock Text="{Binding Label}"
-                                                           TextAlignment="Center"
-                                                           TextWrapping="Wrap"
-                                                           FontSize="10"
-                                                           Foreground="#245A7A"
-                                                           Margin="0,4,0,0"/>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
+                                                               TextWrapping="Wrap"
+                                                               Margin="0,0,8,0"/>
+                                                    <Border Grid.Column="1"
+                                                            Height="22"
+                                                            Width="{Binding HeightPercent, Converter={StaticResource BarWidthConverterLost}}"
+                                                            HorizontalAlignment="Left"
+                                                            VerticalAlignment="Center"
+                                                            CornerRadius="2"
+                                                            Background="{Binding BarBrush}">
+                                                        <TextBlock Text="{Binding Count, StringFormat={}{0}}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   FontSize="10"
+                                                                   Foreground="{Binding CountForeground}"/>
+                                                    </Border>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </DockPanel>
                         </DockPanel>
                     </GroupBox>
                 </Grid>
