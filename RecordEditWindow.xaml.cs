@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
@@ -31,8 +32,15 @@ public partial class RecordEditWindow : Window
             DatePicker.Value = _record.Date;
             if (_record.Time is TimeSpan t)
             {
-                TimePickerControl.Value = DateTime.Today.Add(t);
+                HoursUpDown.Value = t.Hours;
+                MinutesUpDown.Value = t.Minutes;
             }
+            else
+            {
+                HoursUpDown.Value = null;
+                MinutesUpDown.Value = null;
+            }
+
             PilotComboBox.SelectedValue = _record.PilotId;
             WeaponComboBox.SelectedValue = _record.WeaponId;
             FlyingResultComboBox.SelectedValue = _record.FlyingResultId;
@@ -49,6 +57,8 @@ public partial class RecordEditWindow : Window
         else
         {
             DatePicker.Value = DateTime.Today;
+            HoursUpDown.Value = null;
+            MinutesUpDown.Value = null;
             Title = "Новий запис";
             ReasonComboBox.IsEnabled = false;
             SubreasonLostDroneComboBox.IsEnabled = false;
@@ -60,16 +70,34 @@ public partial class RecordEditWindow : Window
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
     {
+        var missing = new List<string>();
         if (DatePicker.Value == null)
+            missing.Add("дата");
+        if (PilotComboBox.SelectedValue as int? == null)
+            missing.Add("пілот");
+        if (WeaponComboBox.SelectedValue as int? == null)
+            missing.Add("озброєння");
+        if (FlyingResultComboBox.SelectedValue as int? == null)
+            missing.Add("результат польоту");
+
+        if (missing.Count > 0)
         {
-            MessageBox.Show("Вкажіть дату.", "Помилка", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(
+                "Заповніть обов'язкові поля: " + string.Join(", ", missing) + ".",
+                "Помилка",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             return;
         }
 
         TimeSpan? time = null;
-        if (TimePickerControl.Value is DateTime dt)
+        var h = HoursUpDown.Value;
+        var m = MinutesUpDown.Value;
+        if (h.HasValue || m.HasValue)
         {
-            time = dt.TimeOfDay;
+            var hh = Math.Clamp(h ?? 0, 0, 23);
+            var mm = Math.Clamp(m ?? 0, 0, 59);
+            time = new TimeSpan(0, hh, mm, 0);
         }
 
         int? pilotId = PilotComboBox.SelectedValue as int?;

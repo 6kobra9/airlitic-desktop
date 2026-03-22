@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AirLitic: ;VB0: + 0=0;VB8:0 (AB>2?G8:8) + 7<VO  ;0:>=VG=89 <>=>E@>< -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>AirLitic concept</title>
+  <!-- <VO: >4=0 ?;02=0 ;V=VO 7 «3>;>2>N»-:@0?:>N -->
+  <path d="M4 52 C14 52 12 38 24 40 C36 42 34 28 46 30 C52 31 54 24 58 20"
+        stroke="#0f172a" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="58" cy="19" r="2.5" fill="#0f172a"/>
+
+  <!-- V=V-3@0DV: (0=0;VB8:0) -->
+  <rect x="10" y="38" width="5" height="14" rx="1" fill="#2563eb"/>
+  <rect x="18" y="32" width="5" height="20" rx="1" fill="#2563eb"/>
+  <rect x="26" y="36" width="5" height="16" rx="1" fill="#2563eb"/>
+
+  <!-- !?@>I5=89 ;VB0: (A8;C5B) -->
+  <path d="M38 14 L54 26 L42 26 L38 32 L36 26 L30 24 Z" fill="#1d4ed8"/>
+  <path d="M36 26 L52 26" stroke="#1e40af" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

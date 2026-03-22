@@ -2,12 +2,15 @@ using System;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Win32;
 
 namespace AirLiticApp;
 
@@ -15,6 +18,13 @@ public partial class WeaponsReportWindow : Window
 {
     public ObservableCollection<LostStackSegment> LostStackSegments { get; } = new();
     public ObservableCollection<StackBarItem> MainStackItems { get; } = new();
+
+    private DataTable? _exportMainTable;
+    private DataTable? _exportLostTable;
+    private DateTime _exportFrom;
+    private DateTime _exportTo;
+    private ReportKind _exportKind;
+    private bool _hasExportData;
 
     public WeaponsReportWindow()
     {
@@ -68,6 +78,13 @@ public partial class WeaponsReportWindow : Window
 
         MainHitsChartGroup.Visibility = Visibility.Collapsed;
         LostReasonsChartGroup.Visibility = Visibility.Collapsed;
+        MainChartAxisText.Text = string.Empty;
+        LostChartAxisText.Text = string.Empty;
+
+        _exportMainTable = null;
+        _exportLostTable = null;
+        _hasExportData = false;
+        ExportExcelButton.IsEnabled = false;
 
         LostTableGroup.Visibility = Visibility.Visible;
         if (RootGrid.RowDefinitions.Count > 2)
@@ -138,7 +155,7 @@ public partial class WeaponsReportWindow : Window
         BindDataTableToGrid(ReportGrid, mainReport);
         ReportGrid.ItemsSource = mainReport.DefaultView;
         BuildMainTableFooter(mainReport);
-        BuildMainStackChart(mainReport);
+        BuildMainStackChart(mainReport, lostReport);
 
         BindDataTableToGrid(LostReportGrid, lostReport);
         LostReportGrid.ItemsSource = lostReport.DefaultView;
@@ -151,6 +168,111 @@ public partial class WeaponsReportWindow : Window
 
         MainHitsChartGroup.Visibility = Visibility.Visible;
         LostReasonsChartGroup.Visibility = Visibility.Visible;
+
+        _exportMainTable = mainReport;
+        _exportLostTable = lostReport;
+        _exportFrom = periodFrom;
+        _exportTo = periodTo;
+        _exportKind = kind;
+        _hasExportData = true;
+        ExportExcelButton.IsEnabled = true;
+    }
+
+    private void ExportExcelButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_hasExportData || _exportMainTable == null || _exportLostTable == null)
+        {
+            MessageBox.Show("Спочатку натисніть «Сформувати», щоб отримати дані для експорту.",
+                "Експорт у Excel", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dlg = new SaveFileDialog
+        {
+            Filter = "Excel (*.xlsx)|*.xlsx|Усі файли (*.*)|*.*",
+            FileName = $"Звіт_{_exportKind}_{_exportFrom:yyyyMMdd}-{_exportTo:yyyyMMdd}.xlsx",
+            DefaultExt = ".xlsx",
+            AddExtension = true
+        };
+
+        if (dlg.ShowDialog() != true)
+            return;
+
+        MemoryStream? mainPng = null;
+        MemoryStream? lostPng = null;
+        try
+        {
+            TryRenderElementToPng(MainHitsChartGroup, out mainPng);
+            TryRenderElementToPng(LostReasonsChartGroup, out lostPng);
+
+            ReportExcelExporter.ExportToFile(
+                dlg.FileName,
+                _exportKind,
+                _exportFrom,
+                _exportTo,
+                _exportMainTable,
+                _exportLostTable,
+                MainStackItems.ToList(),
+                LostStackSegments.ToList(),
+                mainPng,
+                lostPng);
+
+            MessageBox.Show($"Файл збережено:\n{dlg.FileName}", "Експорт у Excel",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Не вдалося зберегти Excel:\n{ex.Message}", "Помилка",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            mainPng?.Dispose();
+            lostPng?.Dispose();
+        }
+    }
+
+    /// <summary>Рендерить WPF-елемент у PNG для вставки в Excel.</summary>
+    private static bool TryRenderElementToPng(FrameworkElement element, out MemoryStream? stream)
+    {
+        stream = null;
+        try
+        {
+            if (element.Visibility != Visibility.Visible)
+                return false;
+
+            element.UpdateLayout();
+            var w = element.ActualWidth;
+            var h = element.ActualHeight;
+            if (w <= 0 || h <= 0)
+            {
+                element.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                element.Arrange(new Rect(element.DesiredSize));
+                w = element.DesiredSize.Width;
+                h = element.DesiredSize.Height;
+            }
+
+            if (w <= 0 || h <= 0)
+                return false;
+
+            var pw = Math.Max(1, (int)Math.Ceiling(w));
+            var ph = Math.Max(1, (int)Math.Ceiling(h));
+            const double dpi = 96;
+            var bmp = new RenderTargetBitmap(pw, ph, dpi, dpi, PixelFormats.Pbgra32);
+            bmp.Render(element);
+            stream = new MemoryStream();
+            var enc = new PngBitmapEncoder();
+            enc.Frames.Add(BitmapFrame.Create(bmp));
+            enc.Save(stream);
+            stream.Position = 0;
+            return true;
+        }
+        catch
+        {
+            stream?.Dispose();
+            stream = null;
+            return false;
+        }
     }
 
     private void BuildMainTableFooter(DataTable table)
@@ -295,87 +417,38 @@ public partial class WeaponsReportWindow : Window
             .Trim();
     }
 
-    private void BuildMainStackChart(DataTable table)
+    private void BuildMainStackChart(DataTable mainReport, DataTable lostReport)
     {
         MainStackItems.Clear();
+        MainChartAxisText.Text = string.Empty;
 
-        var totalCol =
-            table.Columns.Contains("Кіл-ть вильотів")
-                ? "Кіл-ть вильотів"
-                : table.Columns.Contains("TotalHits")
-                    ? "TotalHits"
-                    : null;
-
-        if (totalCol == null)
-        {
-            foreach (DataColumn col in table.Columns)
-            {
-                var n = col.ColumnName;
-                if (n.Contains("Кіл", StringComparison.OrdinalIgnoreCase) &&
-                    n.Contains("виль", StringComparison.OrdinalIgnoreCase))
-                {
-                    totalCol = n;
-                    break;
-                }
-            }
-        }
-
-        if (totalCol == null)
+        if (!TryResolveMainTotalAndHitsColumns(mainReport, out var totalCol, out var hitsCol))
             return;
-
-        string? hitsCol = null;
-        string? missesCol = null;
-        foreach (DataColumn col in table.Columns)
-        {
-            var n = col.ColumnName;
-            var norm = NormalizeReportColumnHeader(n);
-            if (norm.Equals("Уражено", StringComparison.OrdinalIgnoreCase))
-                hitsCol = n;
-            if (norm.Equals("Не уражено", StringComparison.OrdinalIgnoreCase) ||
-                norm.Equals("Не уражент", StringComparison.OrdinalIgnoreCase))
-                missesCol = n;
-        }
-
-        if (hitsCol == null || missesCol == null)
-        {
-            foreach (DataColumn col in table.Columns)
-            {
-                var n = col.ColumnName;
-                var hasUraz = n.Contains("Ураж", StringComparison.OrdinalIgnoreCase);
-                var hasNe = n.Contains("Не", StringComparison.OrdinalIgnoreCase);
-
-                if (missesCol == null && hasUraz && hasNe)
-                    missesCol = n;
-                else if (hitsCol == null && hasUraz && !hasNe)
-                    hitsCol = n;
-            }
-        }
-
-        if (hitsCol == null || missesCol == null)
-            return;
-
-        var kpiCol = FindKpiColumn(table);
 
         double maxTotal = 0d;
-        foreach (DataRow row in table.Rows)
+        foreach (DataRow row in mainReport.Rows)
         {
-            var total = TryGetDouble(row[totalCol]);
-            if (total > maxTotal) maxTotal = total;
+            var t = TryGetDouble(row[totalCol!]);
+            if (t > maxTotal) maxTotal = t;
         }
 
         if (maxTotal <= 0)
             return;
 
-        foreach (DataRow row in table.Rows)
-        {
-            var label = row[0]?.ToString() ?? string.Empty;
-            var total = TryGetDouble(row[totalCol]);
-            var hits = TryGetDouble(row[hitsCol]);
-            var misses = TryGetDouble(row[missesCol]);
+        var kpiCol = FindKpiColumn(mainReport);
+        UpdateMainChartAxisTicks(maxTotal);
 
-            var totalPct = total / maxTotal * 100d;
-            var hitsPct = hits / maxTotal * 100d;
-            var missesPct = misses / maxTotal * 100d;
+        foreach (DataRow row in mainReport.Rows)
+        {
+            var label = row[0]?.ToString()?.Trim() ?? string.Empty;
+            var total = TryGetDouble(row[totalCol!]);
+            var successful = TryGetDouble(row[hitsCol!]);
+            var failed = LookupLostFlightsCountForLabel(lostReport, label);
+
+            if (successful > total)
+                successful = total;
+            failed = Math.Min(failed, Math.Max(0, total - successful));
+            var other = Math.Max(0, total - successful - failed);
 
             var kpiDisplay = string.Empty;
             if (kpiCol != null && TryToDouble(row[kpiCol], out var kpiVal))
@@ -385,14 +458,102 @@ public partial class WeaponsReportWindow : Window
             {
                 Label = label,
                 TotalCount = total,
-                HitsCount = hits,
-                MissesCount = misses,
-                SpacerPercent = Math.Max(0, 100d - totalPct),
-                HitsStackPercent = hitsPct,
-                MissesStackPercent = missesPct,
+                SuccessCount = successful,
+                FailedCount = failed,
+                OtherCount = other,
+                SuccessTrackPercent = 100d * successful / maxTotal,
+                FailedTrackPercent = 100d * failed / maxTotal,
+                OtherTrackPercent = 100d * other / maxTotal,
                 KpiDisplay = kpiDisplay
             });
         }
+    }
+
+    /// <summary>Колонки «Кіл-ть вильотів» та «Уражено» для основного звіту.</summary>
+    private static bool TryResolveMainTotalAndHitsColumns(DataTable table, out string? totalCol, out string? hitsCol)
+    {
+        totalCol = null;
+        hitsCol = null;
+
+        if (table.Columns.Contains("Кіл-ть вильотів"))
+            totalCol = "Кіл-ть вильотів";
+        else if (table.Columns.Contains("TotalHits"))
+            totalCol = "TotalHits";
+        else
+        {
+            foreach (DataColumn col in table.Columns)
+            {
+                var n = col.ColumnName;
+                if (n.Contains("Кіл", StringComparison.OrdinalIgnoreCase) &&
+                    n.Contains("виль", StringComparison.OrdinalIgnoreCase) &&
+                    !n.Contains("невдал", StringComparison.OrdinalIgnoreCase))
+                {
+                    totalCol = n;
+                    break;
+                }
+            }
+        }
+
+        if (totalCol == null)
+            return false;
+
+        foreach (DataColumn col in table.Columns)
+        {
+            var n = col.ColumnName;
+            var norm = NormalizeReportColumnHeader(n);
+            if (norm.Equals("Уражено", StringComparison.OrdinalIgnoreCase))
+                hitsCol = n;
+        }
+
+        if (hitsCol == null)
+        {
+            foreach (DataColumn col in table.Columns)
+            {
+                var n = col.ColumnName;
+                if (n.Contains("Ураж", StringComparison.OrdinalIgnoreCase) &&
+                    !n.Contains("Не", StringComparison.OrdinalIgnoreCase))
+                {
+                    hitsCol = n;
+                    break;
+                }
+            }
+        }
+
+        return hitsCol != null;
+    }
+
+    /// <summary>Кількість невдалих вильотів з нижньої таблиці для того ж засобу/пілота.</summary>
+    private static double LookupLostFlightsCountForLabel(DataTable lostReport, string label)
+    {
+        if (lostReport.Rows.Count == 0 || string.IsNullOrWhiteSpace(label))
+            return 0d;
+
+        var failedCol = FindTotalFlightsColumn(lostReport, lostFlights: true);
+        if (failedCol == null)
+            return 0d;
+
+        var key = label.Trim();
+        foreach (DataRow r in lostReport.Rows)
+        {
+            var name = r[0]?.ToString()?.Trim() ?? string.Empty;
+            if (string.Equals(name, key, StringComparison.OrdinalIgnoreCase))
+                return TryGetDouble(r[failedCol]);
+        }
+
+        return 0d;
+    }
+
+    private void UpdateMainChartAxisTicks(double maxTotal)
+    {
+        var m = Math.Max(1d, maxTotal);
+        var a0 = 0d;
+        var a1 = Math.Round(m / 4d, MidpointRounding.AwayFromZero);
+        var a2 = Math.Round(m / 2d, MidpointRounding.AwayFromZero);
+        var a3 = Math.Round(3d * m / 4d, MidpointRounding.AwayFromZero);
+        var a4 = Math.Round(m, MidpointRounding.AwayFromZero);
+        var fmt = (double v) => v.ToString("N0", CultureInfo.CurrentCulture);
+        MainChartAxisText.Text =
+            $"{fmt(a0)}          {fmt(a1)}          {fmt(a2)}          {fmt(a3)}          {fmt(a4)}";
     }
 
     private static DataColumn? FindKpiColumn(DataTable table)
@@ -427,6 +588,7 @@ public partial class WeaponsReportWindow : Window
     private void BuildLostStackedChart(DataTable table)
     {
         LostStackSegments.Clear();
+        LostChartAxisText.Text = string.Empty;
 
         var totalHitsColumn = table.Columns.Contains("TotalHits")
             ? "TotalHits"
@@ -462,6 +624,13 @@ public partial class WeaponsReportWindow : Window
         var total = sumPilot + sumTech + sumVorezh + sumOwnReb + sumEnemyReb + sumWeather;
         if (total <= 0)
             return;
+
+        LostChartAxisText.Text = string.Format(CultureInfo.CurrentCulture,
+            "0          {0:N0}          {1:N0}          {2:N0}          {3:N0}",
+            Math.Round(total / 4d, MidpointRounding.AwayFromZero),
+            Math.Round(total / 2d, MidpointRounding.AwayFromZero),
+            Math.Round(3d * total / 4d, MidpointRounding.AwayFromZero),
+            Math.Round(total, MidpointRounding.AwayFromZero));
 
         void AddSegment(string label, double count, Color barColor, bool lightBar)
         {
@@ -527,13 +696,28 @@ public partial class WeaponsReportWindow : Window
     {
         public string Label { get; set; } = string.Empty;
         public double TotalCount { get; set; }
-        public double HitsCount { get; set; }
-        public double MissesCount { get; set; }
-        public double SpacerPercent { get; set; }
-        public double HitsStackPercent { get; set; }
-        public double MissesStackPercent { get; set; }
+        /// <summary>Успішні (уражено).</summary>
+        public double SuccessCount { get; set; }
+        /// <summary>Невдалі вильоти (з нижнього звіту).</summary>
+        public double FailedCount { get; set; }
+        /// <summary>Решта вильотів (не ураження й не з нижнього звіту як невдалі).</summary>
+        public double OtherCount { get; set; }
+        /// <summary>Частка від максимального «Кіл-ть вильотів» по всіх рядках (0–100) для ширини смуги на осі X.</summary>
+        public double SuccessTrackPercent { get; set; }
+        public double FailedTrackPercent { get; set; }
+        public double OtherTrackPercent { get; set; }
         /// <summary>KPI з таблиці, округлений до цілого у відсотках (напр. «42%») або порожньо.</summary>
         public string KpiDisplay { get; set; } = string.Empty;
+
+        public string HoverSummary =>
+            string.Format(
+                CultureInfo.CurrentCulture,
+                "{0}\nВсього вильотів: {1:N0}\nУдачні (уражено): {2:N0}\nНевдалі: {3:N0}\nІнші: {4:N0}",
+                Label,
+                TotalCount,
+                SuccessCount,
+                FailedCount,
+                OtherCount);
     }
 
     public class LostStackSegment

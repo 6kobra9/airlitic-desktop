@@ -43,14 +43,39 @@
                              Grid.Column="1"
                              Style="{StaticResource InputControlStyle}"
                              Format="ShortDate"
-                             TimePickerVisibility="Collapsed"/>
+                             TimePickerVisibility="Collapsed"
+                             Height="32"
+                             FontSize="14"/>
 
         <TextBlock Grid.Row="1" Text="Час:" Style="{StaticResource LabelStyle}"/>
-        <xctk:TimePicker x:Name="TimePickerControl"
-                         Grid.Row="1" Grid.Column="1"
-                         Style="{StaticResource InputControlStyle}"
-                         Format="ShortTime"
-                         EndTime="23:59:00"/>
+        <StackPanel Grid.Row="1" Grid.Column="1"
+                    Orientation="Horizontal"
+                    VerticalAlignment="Center"
+                    Margin="0,0,0,10">
+            <xctk:IntegerUpDown x:Name="HoursUpDown"
+                                Width="72"
+                                Height="28"
+                                VerticalAlignment="Center"
+                                Margin="0,0,6,0"
+                                Minimum="0"
+                                Maximum="23"
+                                Increment="1"
+                                ClipValueToMinMax="True"
+                                Watermark="год"
+                                FormatString="00"/>
+            <TextBlock Text=":" VerticalAlignment="Center" Margin="0,0,6,0" FontWeight="SemiBold"/>
+            <xctk:IntegerUpDown x:Name="MinutesUpDown"
+                                Width="72"
+                                Height="28"
+                                VerticalAlignment="Center"
+                                Margin="0,0,10,0"
+                                Minimum="0"
+                                Maximum="59"
+                                Increment="1"
+                                ClipValueToMinMax="True"
+                                Watermark="хв"
+                                FormatString="00"/>
+        </StackPanel>
 
         <TextBlock Grid.Row="2" Text="Пілот:" Style="{StaticResource LabelStyle}"/>
         <ComboBox x:Name="PilotComboBox" Grid.Row="2" Grid.Column="1"

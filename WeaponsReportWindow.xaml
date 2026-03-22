@@ -66,8 +66,20 @@
                 <DatePicker x:Name="FromDatePicker" Grid.Column="3" SelectedDateFormat="Short" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="4" Text="Дата по" VerticalAlignment="Center" Margin="16,0,8,0"/>
                 <DatePicker x:Name="ToDatePicker" Grid.Column="5" SelectedDateFormat="Short" VerticalAlignment="Center"/>
-                <Button x:Name="GenerateButton" Grid.Column="7" Content="Сформувати" Width="130" Margin="16,0,0,0"
-                        IsDefault="True" Click="GenerateButton_Click"/>
+                <StackPanel Grid.Column="7" Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center">
+                    <Button x:Name="ExportExcelButton"
+                            Content="Вивантажити вExcel"
+                            Width="110"
+                            Margin="0,0,8,0"
+                            Click="ExportExcelButton_Click"
+                            IsEnabled="False"
+                            ToolTip="Зберегти таблиці, дані графіків та зображення графіків у файл .xlsx"/>
+                    <Button x:Name="GenerateButton"
+                            Content="Сформувати"
+                            Width="130"
+                            IsDefault="True"
+                            Click="GenerateButton_Click"/>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -131,19 +143,26 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <StackPanel Grid.Row="0" Margin="0,0,0,10">
-                                <TextBlock Text="Ураження / неураження (накопичувально)"
-                                           FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                <StackPanel Orientation="Horizontal">
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
-                                        <Border Width="12" Height="12" Background="#4F46E5" BorderBrush="#3730A3" BorderThickness="1" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Уражено" VerticalAlignment="Center" FontSize="10"/>
+                                <TextBlock Text="Вильоти по кожному рядку (горизонтальна шкала)"
+                                           FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                <TextBlock Text="Вісь X — кількість вильотів (макс. по звіту); смуга: вдалі (уражено) → невдалі → інші."
+                                           FontSize="10" Foreground="#555" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
+                                        <Border Width="12" Height="12" Background="#16A34A" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Вдалі (уражено)" VerticalAlignment="Center" FontSize="10"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
+                                        <Border Width="12" Height="12" Background="#DC2626" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Невдалі вильоти" VerticalAlignment="Center" FontSize="10"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal">
-                                        <Border Width="12" Height="12" Background="#EA580C" BorderBrush="#3730A3" BorderThickness="1" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Не уражено" VerticalAlignment="Center" FontSize="10"/>
+                                        <Border Width="12" Height="12" Background="#94A3B8" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Інші" VerticalAlignment="Center" FontSize="10"/>
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>
@@ -161,29 +180,37 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Margin="0,0,0,8">
+                                            <Grid Margin="0,0,0,10" ToolTipService.ShowDuration="20000"
+                                                  ToolTip="{Binding HoverSummary}">
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="100" MinWidth="80"/>
-                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="130" MinWidth="100"/>
+                                                    <ColumnDefinition Width="*" MinWidth="160"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="9"
-                                                           TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                <Border Grid.Column="1" Height="30" BorderBrush="#3730A3" BorderThickness="1"
-                                                        CornerRadius="2" Background="#F5F3FF" Padding="2"
-                                                        VerticalAlignment="Center" HorizontalAlignment="Stretch" MaxWidth="520">
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Stretch">
-                                                        <Border Width="{Binding SpacerPercent, Converter={StaticResource MainHorizStackConverter}}"
-                                                                Height="26" Background="Transparent" MinWidth="0"/>
-                                                        <Border Width="{Binding MissesStackPercent, Converter={StaticResource MainHorizStackConverter}}"
-                                                                Height="26" Background="#EA580C" CornerRadius="1" MinWidth="0" Margin="0,0,1,0">
-                                                            <TextBlock Text="{Binding MissesCount, StringFormat={}{0}}"
+                                                <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="10"
+                                                           TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                <Border Grid.Column="1" Height="30" VerticalAlignment="Center"
+                                                        BorderBrush="#CBD5E1" BorderThickness="0,0,0,1"
+                                                        Background="#F8FAFC" SnapsToDevicePixels="True">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4">
+                                                        <Border Height="22" VerticalAlignment="Center" CornerRadius="1" MinWidth="0" Margin="0,0,1,0"
+                                                                Background="#16A34A"
+                                                                Width="{Binding SuccessTrackPercent, Converter={StaticResource MainHorizStackConverter}}">
+                                                            <TextBlock Text="{Binding SuccessCount, StringFormat={}{0}}"
                                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                                                        FontSize="8" Foreground="White"/>
                                                         </Border>
-                                                        <Border Width="{Binding HitsStackPercent, Converter={StaticResource MainHorizStackConverter}}"
-                                                                Height="26" Background="#4F46E5" CornerRadius="1" MinWidth="0">
-                                                            <TextBlock Text="{Binding HitsCount, StringFormat={}{0}}"
+                                                        <Border Height="22" VerticalAlignment="Center" CornerRadius="1" MinWidth="0" Margin="0,0,1,0"
+                                                                Background="#DC2626"
+                                                                Width="{Binding FailedTrackPercent, Converter={StaticResource MainHorizStackConverter}}">
+                                                            <TextBlock Text="{Binding FailedCount, StringFormat={}{0}}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                       FontSize="8" Foreground="White"/>
+                                                        </Border>
+                                                        <Border Height="22" VerticalAlignment="Center" CornerRadius="1" MinWidth="0"
+                                                                Background="#94A3B8"
+                                                                Width="{Binding OtherTrackPercent, Converter={StaticResource MainHorizStackConverter}}">
+                                                            <TextBlock Text="{Binding OtherCount, StringFormat={}{0}}"
                                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
                                                                        FontSize="8" Foreground="White"/>
                                                         </Border>
@@ -193,18 +220,26 @@
                                                            Text="{Binding KpiDisplay}"
                                                            FontSize="10"
                                                            FontWeight="SemiBold"
-                                                           Foreground="#3730A3"
+                                                           Foreground="#0F172A"
                                                            VerticalAlignment="Center"
-                                                           Margin="10,0,0,0"/>
+                                                           Margin="12,0,0,0" MinWidth="36"/>
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </ScrollViewer>
 
-                            <TextBlock Grid.Row="2"
-                                       Text="Довжина смуги — частка від максимальної кількості вильотів (відступ → не уражено → уражено). KPI — округлено до цілих %."
-                                       FontSize="9" Foreground="#666" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="MainChartAxisText"
+                                       Grid.Row="2"
+                                       FontSize="9"
+                                       Foreground="#64748B"
+                                       Margin="140,6,72,0"
+                                       TextAlignment="Left"
+                                       FontFamily="Consolas"/>
+
+                            <TextBlock Grid.Row="3"
+                                       Text="Довжина кольорової смуги відповідає загальній кількості вильотів у рядку відносно максимуму по звіту. KPI — з таблиці."
+                                       FontSize="9" Foreground="#666" Margin="0,8,0,0" TextWrapping="Wrap"/>
                         </Grid>
                     </Border>
                 </Grid>
@@ -265,6 +300,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0" Text="Причини втрати (сума за період, накопичувально)"
@@ -304,7 +340,15 @@
                                 </Border>
                             </ScrollViewer>
 
-                            <StackPanel Grid.Row="2" Margin="0,12,0,0">
+                            <TextBlock x:Name="LostChartAxisText"
+                                       Grid.Row="2"
+                                       FontSize="9"
+                                       Foreground="#64748B"
+                                       Margin="0,8,0,0"
+                                       TextAlignment="Center"
+                                       FontFamily="Consolas"/>
+
+                            <StackPanel Grid.Row="3" Margin="0,12,0,0">
                                 <ItemsControl ItemsSource="{Binding LostStackSegments}" Margin="0,0,0,6">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>

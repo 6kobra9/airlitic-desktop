@@ -1,0 +1,21 @@
+# Сборка
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+publish/
+out/
+
+# Архивы / публикация (часто >100 MB)
+*.7z
+*.zip
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+
+# NuGet
+*.nupkg
