@@ -7,59 +7,276 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using Microsoft.EntityFrameworkCore;
 
 namespace AirLiticApp;
 
 public partial class WeaponsReportWindow : Window
 {
-    public ObservableCollection<LostReasonBarItem> LostReasonItems { get; } = new();
+    public ObservableCollection<LostStackSegment> LostStackSegments { get; } = new();
     public ObservableCollection<StackBarItem> MainStackItems { get; } = new();
 
-    public WeaponsReportWindow(DataTable mainReport, DataTable? lostReport = null)
+    public WeaponsReportWindow()
     {
         InitializeComponent();
         DataContext = this;
 
-        BindDataTableToGrid(ReportGrid, mainReport);
-        ReportGrid.ItemsSource = mainReport.DefaultView;
-        BuildMainStackChart(mainReport);
+        var today = DateTime.Today;
+        FromDatePicker.SelectedDate = today;
+        ToDatePicker.SelectedDate = today;
 
-        if (lostReport != null)
+        ClearResultsUi();
+        UpdateHeadersForKind(GetSelectedKind());
+    }
+
+    private ReportKind GetSelectedKind()
+    {
+        if (ReportTypeCombo.SelectedItem is ComboBoxItem item && item.Tag is ReportKind k)
+            return k;
+        return ReportKind.Weapons;
+    }
+
+    private void ReportTypeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded)
+            return;
+        // Після зміни типу — знову потрібне «Сформувати»; графіки не показуємо
+        ClearResultsUi();
+        UpdateHeadersForKind(GetSelectedKind());
+    }
+
+    private void UpdateHeadersForKind(ReportKind kind)
+    {
+        MainTableGroup.Header = kind == ReportKind.Weapons
+            ? "Загальний звіт по засобам"
+            : "Загальний звіт по пілотах";
+        LostTableGroup.Header = "Звіт по невдалих вильотах (причини втрати)";
+    }
+
+    private void ClearResultsUi()
+    {
+        ReportGrid.ItemsSource = null;
+        ReportGrid.Columns.Clear();
+        LostReportGrid.ItemsSource = null;
+        LostReportGrid.Columns.Clear();
+        MainStackItems.Clear();
+        LostStackSegments.Clear();
+        MainTableFooterSumText.Text = string.Empty;
+        MainTableFooterPanel.Visibility = Visibility.Collapsed;
+        LostTableFooterSumText.Text = string.Empty;
+        LostTableFooterPanel.Visibility = Visibility.Collapsed;
+
+        MainHitsChartGroup.Visibility = Visibility.Collapsed;
+        LostReasonsChartGroup.Visibility = Visibility.Collapsed;
+
+        LostTableGroup.Visibility = Visibility.Visible;
+        if (RootGrid.RowDefinitions.Count > 2)
+            RootGrid.RowDefinitions[2].Height = new GridLength(1, GridUnitType.Star);
+    }
+
+    private void GenerateButton_Click(object sender, RoutedEventArgs e)
+    {
+        var kind = GetSelectedKind();
+        var from = FromDatePicker.SelectedDate?.Date ?? DateTime.Today;
+        var to = ToDatePicker.SelectedDate?.Date ?? DateTime.Today;
+        if (from > to)
+            (from, to) = (to, from);
+
+        var mainSql = ReportSql.ApplyDates(
+            kind == ReportKind.Weapons ? ReportSql.WeaponsMainTemplate : ReportSql.PilotsMainTemplate,
+            from, to);
+        var lostSql = ReportSql.ApplyDates(
+            kind == ReportKind.Weapons ? ReportSql.WeaponsLostTemplate : ReportSql.PilotsLostTemplate,
+            from, to);
+
+        GenerateButton.IsEnabled = false;
+        try
         {
-            BindDataTableToGrid(LostReportGrid, lostReport);
-            LostReportGrid.ItemsSource = lostReport.DefaultView;
-            BuildLostChart(lostReport);
+            using var db = new Data.AppDbContext();
+            var conn = db.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open)
+                conn.Open();
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = mainSql;
+            using var reader = cmd.ExecuteReader();
+            var mainTable = new DataTable();
+            mainTable.Load(reader);
+
+            cmd.CommandText = lostSql;
+            using var reader2 = cmd.ExecuteReader();
+            var lostTable = new DataTable();
+            lostTable.Load(reader2);
+
+            ApplyReportData(mainTable, lostTable, kind, from, to);
         }
-        else
+        catch (Exception ex)
         {
-            LostReportGrid.Visibility = Visibility.Collapsed;
+            MessageBox.Show(
+                Data.DbHealth.IsDatabaseAvailable()
+                    ? ex.Message
+                    : Data.DbHealth.GetUnavailableMessage(),
+                "Помилка звіту",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            GenerateButton.IsEnabled = true;
         }
     }
 
-    /// <summary>
-    /// Явні колонки для DataTable.DefaultView: індексатор DataRowView [ім'я] — інакше колонки з пробілом
-    /// («Не уражено», «Кіл-ть вильотів») не показуються при AutoGenerateColumns.
-    /// </summary>
+    private void ApplyReportData(DataTable mainReport, DataTable lostReport, ReportKind kind, DateTime periodFrom,
+        DateTime periodTo)
+    {
+        Title = kind == ReportKind.Weapons
+            ? $"Звіт по засобам ({periodFrom:dd.MM.yyyy} — {periodTo:dd.MM.yyyy})"
+            : $"Звіт по пілотах ({periodFrom:dd.MM.yyyy} — {periodTo:dd.MM.yyyy})";
+
+        UpdateHeadersForKind(kind);
+
+        BindDataTableToGrid(ReportGrid, mainReport);
+        ReportGrid.ItemsSource = mainReport.DefaultView;
+        BuildMainTableFooter(mainReport);
+        BuildMainStackChart(mainReport);
+
+        BindDataTableToGrid(LostReportGrid, lostReport);
+        LostReportGrid.ItemsSource = lostReport.DefaultView;
+        BuildLostTableFooter(lostReport);
+        BuildLostStackedChart(lostReport);
+
+        LostTableGroup.Visibility = Visibility.Visible;
+        if (RootGrid.RowDefinitions.Count > 2)
+            RootGrid.RowDefinitions[2].Height = new GridLength(1, GridUnitType.Star);
+
+        MainHitsChartGroup.Visibility = Visibility.Visible;
+        LostReasonsChartGroup.Visibility = Visibility.Visible;
+    }
+
+    private void BuildMainTableFooter(DataTable table)
+    {
+        var col = FindTotalFlightsColumn(table, lostFlights: false);
+        if (col == null)
+        {
+            MainTableFooterSumText.Text = string.Empty;
+            MainTableFooterPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var sum = SumColumn(table, col);
+        MainTableFooterSumText.Text =
+            $"Сума «{col.ColumnName}»: {FormatFooterSum(sum)}";
+        MainTableFooterPanel.Visibility = Visibility.Visible;
+    }
+
+    private void BuildLostTableFooter(DataTable table)
+    {
+        var col = FindTotalFlightsColumn(table, lostFlights: true);
+        if (col == null)
+        {
+            LostTableFooterSumText.Text = string.Empty;
+            LostTableFooterPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var sum = SumColumn(table, col);
+        LostTableFooterSumText.Text =
+            $"Сума «{col.ColumnName}»: {FormatFooterSum(sum)}";
+        LostTableFooterPanel.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Колонка «Кіл-ть вильотів» (основна) або «Кіл-ть невдалих вильотів» (lost).</summary>
+    private static DataColumn? FindTotalFlightsColumn(DataTable table, bool lostFlights)
+    {
+        if (lostFlights)
+        {
+            if (table.Columns.Contains("Кіл-ть невдалих вильотів"))
+                return table.Columns["Кіл-ть невдалих вильотів"];
+            if (table.Columns.Contains("TotalHits"))
+                return table.Columns["TotalHits"];
+            foreach (DataColumn col in table.Columns)
+            {
+                var n = NormalizeFooterColumnName(col.ColumnName);
+                if (n.Contains("невдал", StringComparison.OrdinalIgnoreCase) &&
+                    n.Contains("вильот", StringComparison.OrdinalIgnoreCase))
+                    return col;
+            }
+        }
+        else
+        {
+            if (table.Columns.Contains("Кіл-ть вильотів"))
+                return table.Columns["Кіл-ть вильотів"];
+            if (table.Columns.Contains("TotalHits"))
+                return table.Columns["TotalHits"];
+            foreach (DataColumn col in table.Columns)
+            {
+                var n = NormalizeFooterColumnName(col.ColumnName);
+                if (n.Contains("кіл", StringComparison.OrdinalIgnoreCase) &&
+                    n.Contains("вильот", StringComparison.OrdinalIgnoreCase) &&
+                    !n.Contains("невдал", StringComparison.OrdinalIgnoreCase))
+                    return col;
+            }
+        }
+
+        return null;
+    }
+
+    private static string NormalizeFooterColumnName(string name) =>
+        name.Replace('\u00A0', ' ').Replace('\u202F', ' ').Trim();
+
+    private static double SumColumn(DataTable table, DataColumn col)
+    {
+        double sum = 0;
+        foreach (DataRow row in table.Rows)
+        {
+            if (TryToDouble(row[col], out var v) && !double.IsNaN(v) && !double.IsInfinity(v))
+                sum += v;
+        }
+
+        return sum;
+    }
+
+    private static string FormatFooterSum(double sum)
+    {
+        if (Math.Abs(sum - Math.Round(sum)) < 0.0005)
+            return Math.Round(sum).ToString("N0", CultureInfo.CurrentCulture);
+        return sum.ToString("N2", CultureInfo.CurrentCulture);
+    }
+
     private static void BindDataTableToGrid(DataGrid grid, DataTable table)
     {
         grid.Columns.Clear();
         foreach (DataColumn dc in table.Columns)
         {
             var escaped = dc.ColumnName.Replace("]", "]]", StringComparison.Ordinal);
+            var binding = new Binding
+            {
+                Path = new PropertyPath($"[{escaped}]"),
+                Mode = BindingMode.OneWay
+            };
+            // Усі колонки, у назві яких є «KPI» (основна KPI та KPI … у нижній таблиці)
+            if (IsKpiFormattedColumn(dc))
+            {
+                binding.StringFormat = "N1";
+                binding.ConverterCulture = CultureInfo.CurrentCulture;
+            }
+
             var col = new DataGridTextColumn
             {
                 Header = dc.ColumnName,
-                Binding = new Binding
-                {
-                    Path = new PropertyPath($"[{escaped}]"),
-                    Mode = BindingMode.OneWay
-                },
+                Binding = binding,
                 SortMemberPath = dc.ColumnName,
                 MinWidth = 48,
                 Width = new DataGridLength(1, DataGridLengthUnitType.Star)
             };
             grid.Columns.Add(col);
         }
+    }
+
+    private static bool IsKpiFormattedColumn(DataColumn dc)
+    {
+        var n = NormalizeReportColumnHeader(dc.ColumnName);
+        return n.Contains("KPI", StringComparison.OrdinalIgnoreCase);
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)
@@ -137,6 +354,8 @@ public partial class WeaponsReportWindow : Window
         if (hitsCol == null || missesCol == null)
             return;
 
+        var kpiCol = FindKpiColumn(table);
+
         double maxTotal = 0d;
         foreach (DataRow row in table.Rows)
         {
@@ -154,9 +373,13 @@ public partial class WeaponsReportWindow : Window
             var hits = TryGetDouble(row[hitsCol]);
             var misses = TryGetDouble(row[missesCol]);
 
-            var totalPercent = total / maxTotal * 100d;
-            var hitsPercent = hits / maxTotal * 100d;
-            var missesPercent = misses / maxTotal * 100d;
+            var totalPct = total / maxTotal * 100d;
+            var hitsPct = hits / maxTotal * 100d;
+            var missesPct = misses / maxTotal * 100d;
+
+            var kpiDisplay = string.Empty;
+            if (kpiCol != null && TryToDouble(row[kpiCol], out var kpiVal))
+                kpiDisplay = $"{Math.Round(kpiVal, MidpointRounding.AwayFromZero)}%";
 
             MainStackItems.Add(new StackBarItem
             {
@@ -164,11 +387,24 @@ public partial class WeaponsReportWindow : Window
                 TotalCount = total,
                 HitsCount = hits,
                 MissesCount = misses,
-                TotalPercent = totalPercent,
-                HitsPercent = hitsPercent,
-                MissesPercent = missesPercent
+                SpacerPercent = Math.Max(0, 100d - totalPct),
+                HitsStackPercent = hitsPct,
+                MissesStackPercent = missesPct,
+                KpiDisplay = kpiDisplay
             });
         }
+    }
+
+    private static DataColumn? FindKpiColumn(DataTable table)
+    {
+        foreach (DataColumn col in table.Columns)
+        {
+            var norm = NormalizeReportColumnHeader(col.ColumnName);
+            if (norm.Equals("KPI", StringComparison.OrdinalIgnoreCase))
+                return col;
+        }
+
+        return null;
     }
 
     private static double TryGetDouble(object? value)
@@ -188,9 +424,9 @@ public partial class WeaponsReportWindow : Window
         };
     }
 
-    private void BuildLostChart(DataTable table)
+    private void BuildLostStackedChart(DataTable table)
     {
-        LostReasonItems.Clear();
+        LostStackSegments.Clear();
 
         var totalHitsColumn = table.Columns.Contains("TotalHits")
             ? "TotalHits"
@@ -223,41 +459,41 @@ public partial class WeaponsReportWindow : Window
             sumWeather += Math.Round(hits * weatherPct / 100d, 0);
         }
 
-        var max = new[] { sumPilot, sumTech, sumVorezh, sumOwnReb, sumEnemyReb, sumWeather }.Max();
-        if (max <= 0)
+        var total = sumPilot + sumTech + sumVorezh + sumOwnReb + sumEnemyReb + sumWeather;
+        if (total <= 0)
             return;
 
-        void AddReason(string label, double count, Color barColor, bool lightBar)
+        void AddSegment(string label, double count, Color barColor, bool lightBar)
         {
             var brush = new SolidColorBrush(barColor);
             brush.Freeze();
             Brush fg;
             if (lightBar)
             {
-                var dark = new SolidColorBrush(Color.FromRgb(0x0B, 0x35, 0x54));
+                var dark = new SolidColorBrush(Color.FromRgb(0x59, 0x0C, 0x6D));
                 dark.Freeze();
                 fg = dark;
             }
             else
                 fg = Brushes.White;
 
-            LostReasonItems.Add(new LostReasonBarItem
+            LostStackSegments.Add(new LostStackSegment
             {
                 Label = label,
                 Count = count,
-                HeightPercent = count / max * 100d,
+                HeightPercent = count / total * 100d,
                 BarBrush = brush,
                 CountForeground = fg
             });
         }
 
-        // Порядок як у легенді: зверху вниз — той самий зліва направо під стовпчиками
-        AddReason("Помилка пілота", sumPilot, Color.FromRgb(0x1B, 0x4F, 0x72), lightBar: false);
-        AddReason("Технічні помилки", sumTech, Color.FromRgb(0x2E, 0x6F, 0xBF), lightBar: false);
-        AddReason("Вороже збиття", sumVorezh, Color.FromRgb(0x3A, 0x7B, 0xD5), lightBar: false);
-        AddReason("Реб свій", sumOwnReb, Color.FromRgb(0x4F, 0x91, 0xE6), lightBar: false);
-        AddReason("Реб противника", sumEnemyReb, Color.FromRgb(0x66, 0xA6, 0xFF), lightBar: false);
-        AddReason("Погодні умови", sumWeather, Color.FromRgb(0xBF, 0xE3, 0xFF), lightBar: true);
+        // Гама фіолетово-пурпурова (легко розрізняються, зліва направо у смузі)
+        AddSegment("Помилка пілота", sumPilot, Color.FromRgb(0x3B, 0x07, 0x64), lightBar: false);
+        AddSegment("Технічні помилки", sumTech, Color.FromRgb(0x5B, 0x21, 0xB6), lightBar: false);
+        AddSegment("Вороже збиття", sumVorezh, Color.FromRgb(0x7C, 0x2D, 0x92), lightBar: false);
+        AddSegment("Реб свій", sumOwnReb, Color.FromRgb(0xA2, 0x1C, 0xAF), lightBar: false);
+        AddSegment("Реб противника", sumEnemyReb, Color.FromRgb(0xC0, 0x26, 0xD3), lightBar: false);
+        AddSegment("Погодні умови", sumWeather, Color.FromRgb(0xF5, 0xD0, 0xFE), lightBar: true);
     }
 
     private static bool TryToDouble(object? value, out double result)
@@ -290,21 +526,20 @@ public partial class WeaponsReportWindow : Window
     public class StackBarItem
     {
         public string Label { get; set; } = string.Empty;
-
         public double TotalCount { get; set; }
         public double HitsCount { get; set; }
         public double MissesCount { get; set; }
-
-        public double TotalPercent { get; set; }
-        public double HitsPercent { get; set; }
-        public double MissesPercent { get; set; }
+        public double SpacerPercent { get; set; }
+        public double HitsStackPercent { get; set; }
+        public double MissesStackPercent { get; set; }
+        /// <summary>KPI з таблиці, округлений до цілого у відсотках (напр. «42%») або порожньо.</summary>
+        public string KpiDisplay { get; set; } = string.Empty;
     }
 
-    public class LostReasonBarItem
+    public class LostStackSegment
     {
         public string Label { get; set; } = string.Empty;
         public double Count { get; set; }
-        /// <summary>Висота стовпчика відносно максимальної причини (0–100).</summary>
         public double HeightPercent { get; set; }
         public Brush BarBrush { get; set; } = Brushes.Gray;
         public Brush CountForeground { get; set; } = Brushes.White;
