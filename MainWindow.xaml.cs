@@ -141,6 +141,15 @@ public partial class MainWindow : Window
         reportWindow.ShowDialog();
     }
 
+    private void ServiceMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        MessageBox.Show(
+            "Довідка\n\nТел.: 0507506455\nkobra aka marek",
+            "Сервіс",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+    }
+
     private void SimpleReportMenuItem_Click(object sender, RoutedEventArgs e)
     {
         using var db = new Data.AppDbContext();

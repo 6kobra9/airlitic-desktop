@@ -10,6 +10,7 @@
                 <MenuItem Header="Вихід" Click="ExitMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="Звіти" Click="ReportsMenuItem_Click"/>
+            <MenuItem Header="Сервіс" Click="ServiceMenuItem_Click"/>
             <MenuItem x:Name="AdminMenuItem" Header="Коригування довідників" Visibility="Collapsed">
                 <MenuItem Header="Пілоти" Click="PilotsMenuItem_Click"/>
                 <MenuItem Header="Засоби" Click="WeaponsMenuItem_Click"/>
