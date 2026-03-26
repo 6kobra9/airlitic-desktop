@@ -717,6 +717,21 @@ order by weapon_name, wp.id";
         {
             EnsureWeaponMetaTables(conn, tx);
 
+            // Перед полной пересборкой weapon_parts снимаем ссылки из results,
+            // иначе FK results.weapon_part_id -> weapon_parts.id блокирует delete.
+            using (var clearRefs = conn.CreateCommand())
+            {
+                clearRefs.Transaction = tx;
+                clearRefs.CommandText = @"
+if col_length('dbo.results','weapon_part_id') is not null
+begin
+    update dbo.results
+    set weapon_part_id = null
+    where weapon_part_id is not null;
+end";
+                clearRefs.ExecuteNonQuery();
+            }
+
             using (var del = conn.CreateCommand())
             {
                 del.Transaction = tx;
