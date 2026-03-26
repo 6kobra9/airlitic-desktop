@@ -39,11 +39,59 @@ public partial class MainWindow : Window
         {
             using var db = new Data.AppDbContext();
             var pilots = db.Pilots.ToDictionary(p => p.Id, p => p.Name);
-            var weapons = db.Weapons.ToDictionary(w => w.Id, w => w.Name);
+            var weaponInfoByResultId =
+                new System.Collections.Generic.Dictionary<int, (int? WeaponPartId, int? WeaponId, string? WeaponName, string? WeaponTypeName, string? VideoTypeName, string? Serial, string? FrequencyMhz)>();
             var flyingResults = db.FlyingResults.ToDictionary(f => f.Id, f => f.Name);
             var reasons = db.Reasons.ToDictionary(r => r.Id, r => r.Name);
             var subreasons = db.SubreasonLostDrones.ToDictionary(s => s.Id, s => s.Name);
             var subreasonTeches = db.SubreasonTeches.ToDictionary(s => s.Id, s => s.Name);
+
+            try
+            {
+                var conn = db.Database.GetDbConnection();
+                if (conn.State != System.Data.ConnectionState.Open)
+                    conn.Open();
+
+                using var cmd = conn.CreateCommand();
+                // Тянем данные по оружию одним join-запросом от results.
+                cmd.CommandText = @"
+select
+    r.id as result_id,
+    r.weapon_part_id,
+    w.id as weapon_id,
+    coalesce(
+        nullif(ltrim(rtrim(w.name)), ''),
+        nullif(ltrim(rtrim(w.code)), '')
+    ) as weapon_name,
+    wt.name as weapon_type_name,
+    vt.name as video_type_name,
+    wp.serial_number,
+    wp.frequency_mhz
+from results r
+left join weapon_parts wp on wp.id = r.weapon_part_id
+left join weapon w on w.id = wp.weapon_id
+left join weapon_type wt on wt.id = w.type_id
+left join video_type vt on vt.id = wp.video_type_id;";
+
+                using var rd = cmd.ExecuteReader();
+                while (rd.Read())
+                {
+                    var resultId = rd.IsDBNull(0) ? 0 : rd.GetInt32(0);
+                    if (resultId <= 0) continue;
+                    int? weaponPartId = rd.IsDBNull(1) ? null : rd.GetInt32(1);
+                    int? weaponId = rd.IsDBNull(2) ? null : rd.GetInt32(2);
+                    var weaponName = rd.IsDBNull(3) ? null : rd.GetString(3);
+                    var weaponTypeName = rd.IsDBNull(4) ? null : rd.GetString(4);
+                    var videoTypeName = rd.IsDBNull(5) ? null : rd.GetString(5);
+                    var serial = rd.IsDBNull(6) ? null : rd.GetString(6);
+                    var frequencyMhz = rd.IsDBNull(7) ? null : rd.GetDecimal(7).ToString();
+                    weaponInfoByResultId[resultId] = (weaponPartId, weaponId, weaponName, weaponTypeName, videoTypeName, serial, frequencyMhz);
+                }
+            }
+            catch
+            {
+                // Если справочники/колонки еще не созданы — просто оставим пустые значения.
+            }
 
             foreach (var record in db.Records.OrderBy(r => r.Date))
             {
@@ -52,10 +100,26 @@ public partial class MainWindow : Window
                 else
                     record.PilotName = null;
 
-                if (record.WeaponId.HasValue && weapons.TryGetValue(record.WeaponId.Value, out var wName))
-                    record.WeaponName = wName;
+                if (weaponInfoByResultId.TryGetValue(record.Id, out var weaponInfo))
+                {
+                    record.WeaponPartId = weaponInfo.WeaponPartId;
+                    record.WeaponId = weaponInfo.WeaponId;
+                    record.WeaponName = weaponInfo.WeaponName;
+                    record.WeaponSerialNumber = weaponInfo.Serial;
+                    record.WeaponTypeName = weaponInfo.WeaponTypeName;
+                    record.WeaponVideoTypeName = weaponInfo.VideoTypeName;
+                    record.WeaponFrequencyMhz = weaponInfo.FrequencyMhz;
+                }
                 else
+                {
+                    record.WeaponId = null;
+                    record.WeaponPartId = null;
                     record.WeaponName = null;
+                    record.WeaponSerialNumber = null;
+                    record.WeaponTypeName = null;
+                    record.WeaponVideoTypeName = null;
+                    record.WeaponFrequencyMhz = null;
+                }
 
                 if (record.FlyingResultId.HasValue && flyingResults.TryGetValue(record.FlyingResultId.Value, out var frName))
                     record.FlyingResultName = frName;
@@ -82,9 +146,9 @@ public partial class MainWindow : Window
                 _records.Add(record);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            MessageBox.Show(Data.DbHealth.GetUnavailableMessage(), "Помилка", MessageBoxButton.OK,
+            MessageBox.Show($"Помилка завантаження даних: {ex.Message}", "Помилка", MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
     }

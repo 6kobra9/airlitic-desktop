@@ -75,10 +75,16 @@ CREATE TABLE [dbo].[results](
 	[Date] [datetime2](7) NULL,
 	[time] [time](7) NULL,
 	[pilot_id] [int] NULL,
-	[weapon_id] [int] NULL,
+	[squad_id] [int] NULL,
+	[weapon_part_id] [int] NULL,
 	[flying_result_id] [int] NULL,
 	[reason_id] [int] NULL,
 	[description] [nvarchar](max) NOT NULL,
+	[weather_temperature] [nvarchar](255) NULL,
+	[weather_wind_direction] [nvarchar](255) NULL,
+	[weather_wind_speed] [nvarchar](255) NULL,
+	[weather_precipitation] [nvarchar](255) NULL,
+	[weather_cloud_cover] [nvarchar](255) NULL,
 	[user_id] [int] NULL,
 	[dlc] [datetime2](7) NULL,
 	[subreason_tech_id] [int] NULL,
@@ -166,11 +172,12 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE TABLE [dbo].[weapon](
+CREATE  TABLE [dbo].[weapon](
 	[Id] [int] IDENTITY(1,1) NOT NULL,
 	[name] [nvarchar](max) NULL,
 	[code] [nvarchar](max) NULL,
 	[type_id] [int] NULL,
+	[subtype_id] [int] NULL,
 PRIMARY KEY CLUSTERED 
 (
 	[Id] ASC
@@ -178,7 +185,154 @@ PRIMARY KEY CLUSTERED
 ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
 GO
 
+USE [airlitics]
+GO
 
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[subtype](
+	[id] [int] IDENTITY(1,1) NOT NULL,
+	[name] [nvarchar](255) NULL,
+PRIMARY KEY CLUSTERED
+(
+	[id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+-- Для вже існуючої БД: додаємо колонку в weapon, якщо її ще нема.
+IF COL_LENGTH('dbo.weapon', 'subtype_id') IS NULL
+BEGIN
+    ALTER TABLE dbo.weapon ADD subtype_id int NULL;
+END
+GO
+
+USE [airlitics]
+GO
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[weapon_type](
+	[id] [int] IDENTITY(1,1) NOT NULL,
+	[name] [nvarchar](255) NULL,
+PRIMARY KEY CLUSTERED
+(
+	[id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+USE [airlitics]
+GO
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[video_type](
+	[id] [int] IDENTITY(1,1) NOT NULL,
+	[name] [nvarchar](255) NULL,
+PRIMARY KEY CLUSTERED
+(
+	[id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+USE [airlitics]
+GO
+
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[weapon_parts](
+	[id] [int] IDENTITY(1,1) NOT NULL,
+	[weapon_id] [int] NOT NULL,
+	[serial_number] [nvarchar](255) NULL,
+	[video_type_id] [int] NULL,
+	[frequency_mhz] [decimal](10,3) NULL
+) ON [PRIMARY]
+GO
+
+IF col_length('dbo.weapon_parts','frequency_mhz') IS NULL
+BEGIN
+    ALTER TABLE dbo.weapon_parts ADD frequency_mhz decimal(10,3) NULL;
+END
+
+IF col_length('dbo.weapon_parts','id') IS NULL
+BEGIN
+    ALTER TABLE dbo.weapon_parts ADD id INT IDENTITY(1,1) NOT NULL;
+END
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = N'PK_weapon_parts_id'
+)
+BEGIN
+    ALTER TABLE dbo.weapon_parts
+    ADD CONSTRAINT PK_weapon_parts_id PRIMARY KEY CLUSTERED (id);
+END
+
+
+
+
+
+
+USE [airlitics]
+GO
+
+INSERT INTO [dbo].[subreason_lost_drone]
+           ([name])
+     VALUES
+           (N'помилка пілота'),
+(N'технічні помилки'),
+(N'вороже збиття'),
+(N'реб свій'),
+(N'реб противника'),
+(N'погодні умови')
+GO
+
+
+USE [airlitics]
+GO
+
+INSERT INTO [dbo].[subreason_tech]
+           ([name])
+     VALUES
+           (N'камера'),
+(N'зв"язок'),
+(N'мотори'),
+(N'батарея')
+GO
+
+
+USE [airlitics]
+GO
+
+INSERT INTO [dbo].[reason]
+           ([name])
+     VALUES
+           (N'Не знайшов'),
+(N'Втрата дрона'),
+(N'Уразили суміжники'),
+(N'Знайшов, не наздогнав'),
+(N'Підрив не в радіусі ураження')
+GO
+
+USE [airlitics]
+GO
+
+INSERT INTO [dbo].[flying_result]
+           ([name])
+     VALUES
+           (N'Уражено'),(N'Не уражено')
+GO
 
 
 

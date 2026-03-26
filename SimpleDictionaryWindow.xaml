@@ -1,33 +1,177 @@
 <Window x:Class="AirLiticApp.SimpleDictionaryWindow"
+        x:Name="RootWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Довідник" Height="480" Width="520"
         WindowStartupLocation="CenterOwner">
     <Grid Margin="12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+
+        <StackPanel x:Name="WeaponsPart1Panel" Grid.Row="0" Orientation="Vertical" Margin="0,0,0,10" Visibility="Collapsed">
+            <TextBlock Text="Засоби" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <DataGrid x:Name="WeaponEntriesGrid"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      SelectionMode="Single"
+                      Margin="0,0,0,8"
+                      IsReadOnly="False"
+                      Height="140">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="ID"
+                                        Binding="{Binding Id}"
+                                        IsReadOnly="True"
+                                        Visibility="Collapsed"/>
+                    <DataGridTextColumn Header="Назва"
+                                        Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                        Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Width="90" Margin="0,0,8,0" Content="Додати" Click="AddWeaponEntry_Click"/>
+                <Button Width="90" Margin="0,0,8,0" Content="Видалити" Click="DeleteWeaponEntry_Click"/>
+                <Button Width="130" Content="Зберегти засоби" Click="SaveWeaponEntries_Click"/>
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel x:Name="PilotsPart1SquadsPanel" Grid.Row="0" Orientation="Vertical" Margin="0,0,0,10" Visibility="Collapsed">
+            <TextBlock Text="Екіпажі" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <DataGrid x:Name="SquadEntriesGrid"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      SelectionMode="Single"
+                      Margin="0,0,0,8"
+                      IsReadOnly="False"
+                      Height="140">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="ID"
+                                        Binding="{Binding Id}"
+                                        IsReadOnly="True"
+                                        Visibility="Collapsed"/>
+                    <DataGridTextColumn Header="Назва"
+                                        Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                        Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Width="90" Margin="0,0,8,0" Content="Додати" Click="AddSquadEntry_Click"/>
+                <Button Width="90" Margin="0,0,8,0" Content="Видалити" Click="DeleteSquadEntry_Click"/>
+                <Button Width="150" Content="Зберегти екіпажі" Click="SaveSquadEntries_Click"/>
+            </StackPanel>
+        </StackPanel>
 
         <DataGrid x:Name="ItemsGrid"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
                   SelectionMode="Single"
                   IsReadOnly="False"
-                  Grid.Row="0"
+                  CellEditEnding="ItemsGrid_CellEditEnding"
+                  Grid.Row="1"
                   Margin="0,0,0,10">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="ID"
                                     Binding="{Binding Id}"
                                     IsReadOnly="True"
                                     Visibility="Collapsed"/>
-                <DataGridTextColumn Header="Назва"
+                <DataGridTextColumn x:Name="PilotNameColumn"
+                                    Header="Пілот"
                                     Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                                    Width="*"/>
+                                    Width="*"
+                                    Visibility="Collapsed"/>
+
+                <DataGridTemplateColumn x:Name="WeaponNameColumn" Header="Назва" Width="*" Visibility="Collapsed">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Name}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <ComboBox
+                                ItemsSource="{Binding ElementName=RootWindow, Path=WeaponNameOptions}"
+                                DisplayMemberPath="DisplayName"
+                                SelectedValuePath="Id"
+                                SelectedValue="{Binding Id, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                SelectionChanged="WeaponNameComboBox_SelectionChanged"
+                                IsEditable="False"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn x:Name="SquadColumn"
+                                    Header="Екіпаж"
+                                    Width="*"
+                                    Visibility="Collapsed">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding SquadName}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <ComboBox IsEditable="False"
+                                      ItemsSource="{Binding ElementName=RootWindow, Path=SquadNameOptions}"
+                                      SelectedItem="{Binding SquadName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn x:Name="SerialNumberColumn"
+                                        Header="Серійний номер"
+                                        Width="*"
+                                        Visibility="Collapsed">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding SerialNumber}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <ComboBox IsEditable="True"
+                                      StaysOpenOnEdit="True"
+                                      ItemsSource="{Binding ElementName=RootWindow, Path=SerialNumberOptions}"
+                                      Text="{Binding SerialNumber, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn x:Name="FrequencyColumn"
+                                        Header="Частота, мГц"
+                                        Width="*"
+                                        Visibility="Collapsed">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding FrequencyMhz}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding FrequencyMhz, UpdateSourceTrigger=PropertyChanged}" MinWidth="80"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn x:Name="VideoTypeColumn"
+                                        Header="Тип відео"
+                                        Width="*"
+                                        Visibility="Collapsed">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding VideoTypeName}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <ComboBox IsEditable="True"
+                                      StaysOpenOnEdit="True"
+                                      ItemsSource="{Binding ElementName=RootWindow, Path=VideoTypeOptions}"
+                                      Text="{Binding VideoTypeName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Width="90" Margin="0,0,8,0" Content="Додати" Click="Add_Click"/>
             <Button Width="90" Margin="0,0,8,0" Content="Видалити" Click="Delete_Click"/>
             <Button Width="110" Content="Зберегти" Click="Save_Click"/>

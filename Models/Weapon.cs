@@ -7,5 +7,7 @@ public class Weapon
 {
     public int Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    [Column("subtype_id")]
+    public int? SubtypeId { get; set; }
 }
 

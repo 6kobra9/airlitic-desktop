@@ -45,7 +45,8 @@ from
         r.id as ResultId,
         rs.name as ReasonName
     from results r
-    left join weapon p on p.id = r.weapon_id
+    left join weapon_parts wp on wp.id = r.weapon_part_id
+    left join weapon p on p.id = wp.weapon_id
     left join flying_result rs on rs.id = r.flying_result_id
     where r.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
 ) src
@@ -57,7 +58,8 @@ pivot
 cross apply (
     select count(*) as TotalHits
     from results rf
-    where rf.weapon_id = (
+    left join weapon_parts rwp on rwp.id = rf.weapon_part_id
+    where rwp.weapon_id = (
         select top(1) id
         from weapon
         where name = p.weaponName
@@ -115,7 +117,8 @@ from
         r.id   as ResultId,
         sld.name as ReasonName
 from results r
-left join weapon wp on wp.id =weapon_id
+    left join weapon_parts wpart on wpart.id = r.weapon_part_id
+    left join weapon wp on wp.id = wpart.weapon_id
 left join subreason_lost_drone sld on sld.id=r.subreason_lost_drone_id
 where flying_result_id=2 and r.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
 ) src
@@ -128,7 +131,8 @@ cross apply (
     select
         count(*) as TotalHits
     from results rf
-    where rf.weapon_id = (
+    left join weapon_parts rwp on rwp.id = rf.weapon_part_id
+    where rwp.weapon_id = (
         select top(1) id
         from weapon
         where name = p.weaponName

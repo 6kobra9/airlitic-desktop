@@ -10,7 +10,6 @@
                 <MenuItem Header="Вихід" Click="ExitMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="Звіти" Click="ReportsMenuItem_Click"/>
-            <MenuItem Header="Сервіс" Click="ServiceMenuItem_Click"/>
             <MenuItem x:Name="AdminMenuItem" Header="Коригування довідників" Visibility="Collapsed">
                 <MenuItem Header="Пілоти" Click="PilotsMenuItem_Click"/>
                 <MenuItem Header="Засоби" Click="WeaponsMenuItem_Click"/>
@@ -37,6 +36,9 @@
                     <DataGridTextColumn Header="Час" Binding="{Binding Time}" Width="*" />
                     <DataGridTextColumn Header="Пілот" Binding="{Binding PilotName}" Width="*" />
                     <DataGridTextColumn Header="Засіб" Binding="{Binding WeaponName}" Width="*" />
+                    <DataGridTextColumn Header="Серійний номер" Binding="{Binding WeaponSerialNumber}" Width="*" />
+                    <DataGridTextColumn Header="Частота, мГц" Binding="{Binding WeaponFrequencyMhz}" Width="*" />
+                    <DataGridTextColumn Header="Тип відеосистеми" Binding="{Binding WeaponVideoTypeName}" Width="*" />
                     <DataGridTextColumn Header="Результат польоту" Binding="{Binding FlyingResultName}" Width="*" />
                     <DataGridTextColumn Header="Причина" Binding="{Binding ReasonName}" Width="*" />
                     <DataGridTextColumn Header="Причина втрати" Binding="{Binding SubreasonLostDroneName}" Width="*" />
