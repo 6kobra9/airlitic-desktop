@@ -21,6 +21,8 @@ public class Record
     public int? FlyingResultId { get; set; }
     [Column("reason_id")]
     public int? ReasonId { get; set; }
+    [Column("serial_number")]
+    public string? SerialNumber { get; set; }
     public string Description { get; set; } = string.Empty;
 
     [Column("weather_temperature")]

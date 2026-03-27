@@ -94,8 +94,16 @@
                   DisplayMemberPath="Name" SelectedValuePath="Id" Style="{StaticResource InputControlStyle}"/>
 
         <TextBlock Grid.Row="4" Text="Озброєння:" Style="{StaticResource LabelStyle}"/>
-        <ComboBox x:Name="WeaponComboBox" Grid.Row="4" Grid.Column="1"
-                  DisplayMemberPath="Name" SelectedValuePath="Id" Style="{StaticResource InputControlStyle}"/>
+        <StackPanel Grid.Row="4" Grid.Column="1">
+            <ComboBox x:Name="WeaponComboBox"
+                      DisplayMemberPath="Name"
+                      SelectedValuePath="Id"
+                      Style="{StaticResource InputControlStyle}"
+                      SelectionChanged="WeaponComboBox_SelectionChanged"/>
+            <TextBox x:Name="SerialNumberTextBox"
+                     Style="{StaticResource InputControlStyle}"
+                     ToolTip="Серійний номер (необов'язково)"/>
+        </StackPanel>
 
         <TextBlock Grid.Row="5" Text="Результат польоту:" Style="{StaticResource LabelStyle}"/>
         <ComboBox x:Name="FlyingResultComboBox" Grid.Row="5" Grid.Column="1"
@@ -117,13 +125,6 @@
                    Text="Погода:"
                    Style="{StaticResource LabelStyle}"
                    Visibility="Collapsed"/>
-        <StackPanel x:Name="RegionPanel" Grid.Row="9" Grid.Column="0" Visibility="Collapsed" Margin="0,26,10,10">
-            <ComboBox x:Name="RegionComboBox"
-                      DisplayMemberPath="Name"
-                      SelectedValuePath="Id"
-                      Style="{StaticResource InputControlStyle}"
-                      SelectionChanged="RegionComboBox_SelectionChanged"/>
-        </StackPanel>
         <Grid x:Name="WeatherPanel" Grid.Row="9" Grid.Column="1" Visibility="Collapsed" Margin="0,26,0,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -136,6 +137,12 @@
                 <ColumnDefinition Width="10"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
+
+            <ComboBox x:Name="RegionComboBox" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
+                      DisplayMemberPath="Name"
+                      SelectedValuePath="Id"
+                      Style="{StaticResource InputControlStyle}"
+                      SelectionChanged="RegionComboBox_SelectionChanged"/>
 
             <TextBox x:Name="TempTextBox" Grid.Row="1" Grid.Column="0"
                      Style="{StaticResource InputControlStyle}" IsReadOnly="False"

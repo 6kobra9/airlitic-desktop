@@ -102,6 +102,7 @@ public partial class RecordEditWindow : Window
             // Теперь в списке выбираем конкретную строку weapon_parts,
             // поэтому selected value должен соответствовать weapon_part_id.
             WeaponComboBox.SelectedValue = _record.WeaponPartId;
+            SerialNumberTextBox.Text = _record.SerialNumber ?? string.Empty;
             FlyingResultComboBox.SelectedValue = _record.FlyingResultId;
             ReasonComboBox.SelectedValue = _record.ReasonId;
             SubreasonLostDroneComboBox.SelectedValue = _record.SubreasonLostDroneId;
@@ -131,6 +132,7 @@ public partial class RecordEditWindow : Window
             SubreasonTechComboBox.SelectedIndex = -1;
             WeatherLabelText.Visibility = Visibility.Visible;
             WeatherPanel.Visibility = Visibility.Visible;
+            SerialNumberTextBox.Text = string.Empty;
             ClearWeatherFields();
             _ = UpdateWeatherVisibilityAsync();
         }
@@ -178,6 +180,7 @@ public partial class RecordEditWindow : Window
         int? reasonId = ReasonComboBox.SelectedValue as int?;
         int? subreasonLostDroneId = SubreasonLostDroneComboBox.SelectedValue as int?;
         int? subreasonTechId = SubreasonTechComboBox.SelectedValue as int?;
+        var serialNumberInput = (SerialNumberTextBox.Text ?? string.Empty).Trim();
 
         // Если пользователь явно не выбрал эскадру (или форма загрузилась без selection),
         // попробуем вычислить squad_id по выбранному пилоту.
@@ -223,6 +226,7 @@ public partial class RecordEditWindow : Window
                 SquadId = squadId,
                 RegionId = regionId,
                 WeaponPartId = weaponPartId,
+                SerialNumber = string.IsNullOrWhiteSpace(serialNumberInput) ? null : serialNumberInput,
                 FlyingResultId = flyingResultId,
                 ReasonId = reasonId,
                 SubreasonLostDroneId = subreasonLostDroneId,
@@ -249,6 +253,7 @@ public partial class RecordEditWindow : Window
                 entity.SquadId = squadId;
                 entity.RegionId = regionId;
                 entity.WeaponPartId = weaponPartId;
+                entity.SerialNumber = string.IsNullOrWhiteSpace(serialNumberInput) ? null : serialNumberInput;
                 entity.FlyingResultId = flyingResultId;
                 entity.ReasonId = reasonId;
                 entity.SubreasonLostDroneId = subreasonLostDroneId;
@@ -286,7 +291,15 @@ public partial class RecordEditWindow : Window
         RegionComboBox.ItemsSource = _regions;
         RegionComboBox.IsEnabled = _regions.Count > 0;
         if (_regions.Count > 0)
-            RegionComboBox.SelectedIndex = 0;
+        {
+            var defaultRegion = _regions.FirstOrDefault(r =>
+                string.Equals((r.Name ?? string.Empty).Trim(), "Степногорск", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals((r.Name ?? string.Empty).Trim(), "Степногірськ", StringComparison.OrdinalIgnoreCase));
+            if (defaultRegion != null)
+                RegionComboBox.SelectedValue = defaultRegion.Id;
+            else
+                RegionComboBox.SelectedIndex = 0;
+        }
 
         WeaponComboBox.ItemsSource = LoadWeaponPartOptions(db);
         FlyingResultComboBox.ItemsSource = db.FlyingResults
@@ -548,6 +561,16 @@ else
         ApplyPilotFilterBySelectedSquad();
     }
 
+    private void WeaponComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (WeaponComboBox.SelectedItem is not WeaponPartOption selected)
+            return;
+        if (!string.IsNullOrWhiteSpace(SerialNumberTextBox.Text))
+            return;
+
+        SerialNumberTextBox.Text = selected.SerialNumber;
+    }
+
     private void RegionComboBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         if (_isInitializing || WeatherPanel.Visibility != Visibility.Visible)
@@ -623,7 +646,6 @@ else
         // Погода отображается всегда и обновляется по выбранной дате/времени,
         // независимо от выбора "Причина втрати" / subreason.
         WeatherLabelText.Visibility = Visibility.Visible;
-        RegionPanel.Visibility = Visibility.Visible;
         WeatherPanel.Visibility = Visibility.Visible;
         SetWeatherLoading();
 
