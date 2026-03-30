@@ -284,46 +284,6 @@ END
 
 
 
-USE [airlitics]
-GO
-
-INSERT INTO [dbo].[subreason_lost_drone]
-           ([name])
-     VALUES
-           (N'помилка пілота'),
-(N'технічні помилки'),
-(N'вороже збиття'),
-(N'реб свій'),
-(N'реб противника'),
-(N'погодні умови')
-GO
-
-
-USE [airlitics]
-GO
-
-INSERT INTO [dbo].[subreason_tech]
-           ([name])
-     VALUES
-           (N'камера'),
-(N'зв"язок'),
-(N'мотори'),
-(N'батарея')
-GO
-
-
-USE [airlitics]
-GO
-
-INSERT INTO [dbo].[reason]
-           ([name])
-     VALUES
-           (N'Не знайшов'),
-(N'Втрата дрона'),
-(N'Уразили суміжники'),
-(N'Знайшов, не наздогнав'),
-(N'Підрив не в радіусі ураження')
-GO
 
 USE [airlitics]
 GO

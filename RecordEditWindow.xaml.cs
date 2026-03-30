@@ -192,10 +192,7 @@ public partial class RecordEditWindow : Window
                 squadId = inferredSquadId;
             }
         }
-        var finalDescription = MergeWeatherIntoDescription(
-            DescriptionTextBox.Text.Trim(),
-            ShouldAttachWeatherToDescription(),
-            BuildWeatherSummaryLine());
+        var finalDescription = DescriptionTextBox.Text.Trim();
         var weatherTemperature = string.IsNullOrWhiteSpace(TempTextBox.Text) ? null : TempTextBox.Text.Trim();
         var weatherWindDirection = string.IsNullOrWhiteSpace(WindDirectionTextBox.Text)
             ? null
