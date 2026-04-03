@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using Microsoft.EntityFrameworkCore;
@@ -84,8 +85,11 @@ left join video_type vt on vt.id = wp.video_type_id;";
                     var weaponTypeName = rd.IsDBNull(4) ? null : rd.GetString(4);
                     var videoTypeName = rd.IsDBNull(5) ? null : rd.GetString(5);
                     var serial = rd.IsDBNull(6) ? null : rd.GetString(6);
-                    var frequencyMhz = rd.IsDBNull(7) ? null : rd.GetDecimal(7).ToString();
-                    weaponInfoByResultId[resultId] = (weaponPartId, weaponId, weaponName, weaponTypeName, videoTypeName, serial, frequencyMhz);
+                    string? frequencyMhz = null;
+                    if (!rd.IsDBNull(7))
+                        frequencyMhz = rd.GetDecimal(7).ToString("0.###", CultureInfo.InvariantCulture);
+                    var weaponDisplay = $"{weaponName ?? string.Empty}/{serial ?? string.Empty}/{frequencyMhz ?? string.Empty}/{videoTypeName ?? string.Empty}";
+                    weaponInfoByResultId[resultId] = (weaponPartId, weaponId, weaponDisplay, weaponTypeName, videoTypeName, serial, frequencyMhz);
                 }
             }
             catch

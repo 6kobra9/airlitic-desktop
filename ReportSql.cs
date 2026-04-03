@@ -61,12 +61,21 @@ select
 from
 (
     select
-        p.name as weaponName,
+        concat(
+            coalesce(nullif(ltrim(rtrim(w.name)), ''''), nullif(ltrim(rtrim(w.code)), ''''), ''''),
+            ''/'',
+            isnull(nullif(ltrim(rtrim(wp.serial_number)), ''''), ''''),
+            ''/'',
+            iif(wp.frequency_mhz is null, '''', format(wp.frequency_mhz, ''0.###'', ''en-US'')),
+            ''/'',
+            isnull(nullif(ltrim(rtrim(vt.name)), ''''), '''')
+        ) as weaponName,
         r.id as ResultId,
         rs.id as ReasonId
     from results r
     left join weapon_parts wp on wp.id = r.weapon_part_id
-    left join weapon p on p.id = wp.weapon_id
+    left join weapon w on w.id = wp.weapon_id
+    left join video_type vt on vt.id = wp.video_type_id
     left join flying_result rs on rs.id = r.flying_result_id
     where r.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
 ) src
@@ -79,11 +88,17 @@ cross apply (
     select count(*) as TotalHits
     from results rf
     left join weapon_parts rwp on rwp.id = rf.weapon_part_id
-    where rwp.weapon_id = (
-        select top(1) id
-        from weapon
-        where name = p.weaponName
-    )
+    left join weapon rw on rw.id = rwp.weapon_id
+    left join video_type rvt on rvt.id = rwp.video_type_id
+    where concat(
+            coalesce(nullif(ltrim(rtrim(rw.name)), ''''), nullif(ltrim(rtrim(rw.code)), ''''), ''''),
+            ''/'',
+            isnull(nullif(ltrim(rtrim(rwp.serial_number)), ''''), ''''),
+            ''/'',
+            iif(rwp.frequency_mhz is null, '''', format(rwp.frequency_mhz, ''0.###'', ''en-US'')),
+            ''/'',
+            isnull(nullif(ltrim(rtrim(rvt.name)), ''''), '''')
+        ) = p.weaponName
       and rf.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
 ) t;
 ';
@@ -135,12 +150,21 @@ select
 from
 (
     select
-        wp.name as weaponName,
+        concat(
+            coalesce(nullif(ltrim(rtrim(w.name)), ''''), nullif(ltrim(rtrim(w.code)), ''''), ''''),
+            ''/'',
+            isnull(nullif(ltrim(rtrim(wpart.serial_number)), ''''), ''''),
+            ''/'',
+            iif(wpart.frequency_mhz is null, '''', format(wpart.frequency_mhz, ''0.###'', ''en-US'')),
+            ''/'',
+            isnull(nullif(ltrim(rtrim(vt.name)), ''''), '''')
+        ) as weaponName,
         r.id   as ResultId,
         sld.name as ReasonName
 from results r
     left join weapon_parts wpart on wpart.id = r.weapon_part_id
-    left join weapon wp on wp.id = wpart.weapon_id
+    left join weapon w on w.id = wpart.weapon_id
+    left join video_type vt on vt.id = wpart.video_type_id
 left join subreason_lost_drone sld on sld.id=r.subreason_lost_drone_id
 where flying_result_id=2 and r.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
 ) src
@@ -154,11 +178,18 @@ cross apply (
         count(*) as TotalHits
     from results rf
     left join weapon_parts rwp on rwp.id = rf.weapon_part_id
-    where rwp.weapon_id = (
-        select top(1) id
-        from weapon
-        where name = p.weaponName
-    ) and flying_result_id=2
+    left join weapon rw2 on rw2.id = rwp.weapon_id
+    left join video_type rvt on rvt.id = rwp.video_type_id
+    where concat(
+            coalesce(nullif(ltrim(rtrim(rw2.name)), ''''), nullif(ltrim(rtrim(rw2.code)), ''''), ''''),
+            ''/'',
+            isnull(nullif(ltrim(rtrim(rwp.serial_number)), ''''), ''''),
+            ''/'',
+            iif(rwp.frequency_mhz is null, '''', format(rwp.frequency_mhz, ''0.###'', ''en-US'')),
+            ''/'',
+            isnull(nullif(ltrim(rtrim(rvt.name)), ''''), '''')
+        ) = p.weaponName
+    and rf.flying_result_id=2
       and rf.Date between ''{{RPT_DF}}'' and ''{{RPT_DT}}''
 ) t;
 ';
