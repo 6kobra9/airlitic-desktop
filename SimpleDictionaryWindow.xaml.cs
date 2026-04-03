@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data;
 using System.Globalization;
 using System.Linq;
@@ -196,7 +197,11 @@ public partial class SimpleDictionaryWindow : Window
         _weaponEntries.Remove(row);
     }
 
-    private void SaveWeaponEntries_Click(object sender, RoutedEventArgs e)
+    private void SaveWeaponEntries_Click(object sender, RoutedEventArgs e) =>
+        TrySaveWeaponEntries(showErrorDialog: true, reloadAfter: true);
+
+    /// <returns>false якщо помилка збереження</returns>
+    private bool TrySaveWeaponEntries(bool showErrorDialog, bool reloadAfter)
     {
         try
         {
@@ -210,9 +215,10 @@ public partial class SimpleDictionaryWindow : Window
 
         if (!Data.DbHealth.IsDatabaseAvailable())
         {
-            MessageBox.Show(Data.DbHealth.GetUnavailableMessage(), "Помилка", MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return;
+            if (showErrorDialog)
+                MessageBox.Show(Data.DbHealth.GetUnavailableMessage(), "Помилка", MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            return false;
         }
 
         var cleaned = _weaponEntries
@@ -255,12 +261,16 @@ public partial class SimpleDictionaryWindow : Window
             }
 
             db.SaveChanges();
-            LoadData();
+            if (reloadAfter)
+                LoadData();
+            return true;
         }
         catch (System.Exception ex)
         {
-            MessageBox.Show($"Помилка збереження засобів: {ex.Message}", "Помилка", MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            if (showErrorDialog)
+                MessageBox.Show($"Помилка збереження засобів: {ex.Message}", "Помилка", MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            return false;
         }
     }
 
@@ -281,7 +291,11 @@ public partial class SimpleDictionaryWindow : Window
         RefreshSquadNameOptions();
     }
 
-    private void SaveSquadEntries_Click(object sender, RoutedEventArgs e)
+    private void SaveSquadEntries_Click(object sender, RoutedEventArgs e) =>
+        TrySaveSquadEntries(showErrorDialog: true, reloadAfter: true);
+
+    /// <returns>false якщо помилка збереження</returns>
+    private bool TrySaveSquadEntries(bool showErrorDialog, bool reloadAfter)
     {
         try
         {
@@ -295,9 +309,10 @@ public partial class SimpleDictionaryWindow : Window
 
         if (!Data.DbHealth.IsDatabaseAvailable())
         {
-            MessageBox.Show(Data.DbHealth.GetUnavailableMessage(), "Помилка", MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return;
+            if (showErrorDialog)
+                MessageBox.Show(Data.DbHealth.GetUnavailableMessage(), "Помилка", MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            return false;
         }
 
         var cleaned = _squadEntries
@@ -414,12 +429,16 @@ public partial class SimpleDictionaryWindow : Window
                 throw;
             }
 
-            LoadData();
+            if (reloadAfter)
+                LoadData();
+            return true;
         }
         catch (System.Exception ex)
         {
-            MessageBox.Show($"Помилка збереження экипажей: {ex.Message}", "Помилка",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (showErrorDialog)
+                MessageBox.Show($"Помилка збереження экипажей: {ex.Message}", "Помилка",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
         }
     }
 
@@ -484,9 +503,13 @@ public partial class SimpleDictionaryWindow : Window
         }
     }
 
-    private void Save_Click(object sender, RoutedEventArgs e)
+    private void Save_Click(object sender, RoutedEventArgs e) =>
+        TrySaveMainDictionary(showErrorDialog: true, reloadAfter: true);
+
+    /// <summary>Зберігає основну таблицю ItemsGrid (пілоти / метадані засобів / підпричини).</summary>
+    /// <returns>false якщо БД недоступна або помилка збереження</returns>
+    private bool TrySaveMainDictionary(bool showErrorDialog, bool reloadAfter)
     {
-       
         try
         {
             ItemsGrid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Cell, true);
@@ -499,9 +522,10 @@ public partial class SimpleDictionaryWindow : Window
 
         if (!Data.DbHealth.IsDatabaseAvailable())
         {
-            MessageBox.Show(Data.DbHealth.GetUnavailableMessage(), "Помилка", MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return;
+            if (showErrorDialog)
+                MessageBox.Show(Data.DbHealth.GetUnavailableMessage(), "Помилка", MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            return false;
         }
 
         var cleaned = _rows
@@ -515,8 +539,6 @@ public partial class SimpleDictionaryWindow : Window
                 FrequencyMhz = (r.FrequencyMhz ?? "").Trim(),
                 VideoTypeName = (r.VideoTypeName ?? "").Trim()
             })
-            // Для существующих записей (Id>0) допускаем пустое Name,
-            // иначе можно потерять метаданные в `weapon_parts`, когда `weapon.name` пустой.
             .Where(r => r.Id > 0 || !string.IsNullOrWhiteSpace(r.Name))
             .ToList();
 
@@ -541,13 +563,63 @@ public partial class SimpleDictionaryWindow : Window
             }
 
             db.SaveChanges();
-            LoadData();
+            if (reloadAfter)
+                LoadData();
+            return true;
         }
         catch (System.Exception ex)
         {
-            MessageBox.Show($"Помилка збереження довідника: {ex.Message}", "Помилка", MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            if (showErrorDialog)
+                MessageBox.Show($"Помилка збереження довідника: {ex.Message}", "Помилка", MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            return false;
         }
+    }
+
+    private void RootWindow_Closing(object? sender, CancelEventArgs e)
+    {
+        var r = MessageBox.Show(
+            "Зберегти зміни в довіднику перед закриттям?",
+            "Довідник",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+        if (r == MessageBoxResult.Cancel)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        if (r == MessageBoxResult.No)
+            return;
+
+        bool ok;
+        if (_kind == SimpleDictionaryKind.Weapons)
+        {
+            ok = TrySaveWeaponEntries(showErrorDialog: true, reloadAfter: false);
+            if (!ok)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            ok = TrySaveMainDictionary(showErrorDialog: true, reloadAfter: false);
+        }
+        else if (_kind == SimpleDictionaryKind.Pilots)
+        {
+            ok = TrySaveSquadEntries(showErrorDialog: true, reloadAfter: false);
+            if (!ok)
+            {
+                e.Cancel = true;
+                return;
+            }
+
+            ok = TrySaveMainDictionary(showErrorDialog: true, reloadAfter: false);
+        }
+        else
+            ok = TrySaveMainDictionary(showErrorDialog: true, reloadAfter: false);
+
+        if (!ok)
+            e.Cancel = true;
     }
 
     private static void SavePilots(Data.AppDbContext db, System.Collections.Generic.List<Row> rows)
@@ -616,7 +688,8 @@ public partial class SimpleDictionaryWindow : Window
             if (!existingIds.Contains(row.Id))
                 continue;
 
-            if (getName(row.Id) != row.Name)
+            var current = getName(row.Id) ?? string.Empty;
+            if (!string.Equals(current, row.Name ?? string.Empty, System.StringComparison.Ordinal))
                 setName(row.Id, row.Name);
 
             existingIds.Remove(row.Id);

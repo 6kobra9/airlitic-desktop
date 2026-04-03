@@ -140,16 +140,50 @@ public partial class RecordEditWindow : Window
         _isInitializing = false;
     }
 
+    /// <summary>
+    /// После смены результата/причины обнуляет лишние FK (reason_id, subreason_*), чтобы в БД не оставались старые связи.
+    /// </summary>
+    private void NormalizeReasonFieldsForSave(int flyingResultId, ref int? reasonId, ref int? subreasonLostDroneId, ref int? subreasonTechId)
+    {
+        // Відповідає FlyingResultComboBox_SelectionChanged / UpdateReasonEnabled (id = 2 — «Не уражено»).
+        const int flyingResultNotHitId = 2;
+        // Відповідає UpdateSubreasonLostDroneVisibility (id = 2 — «Втрата дрона»).
+        const int reasonLostDroneId = 2;
+
+        if (flyingResultId != flyingResultNotHitId)
+        {
+            reasonId = null;
+            subreasonLostDroneId = null;
+            subreasonTechId = null;
+            return;
+        }
+
+        if (!reasonId.HasValue || reasonId.Value != reasonLostDroneId)
+        {
+            subreasonLostDroneId = null;
+            subreasonTechId = null;
+            return;
+        }
+
+        if (SubreasonLostDroneComboBox.SelectedItem is not Models.SubreasonLostDrone sd ||
+            !string.Equals(sd.Name, "технічні помилки", StringComparison.OrdinalIgnoreCase))
+            subreasonTechId = null;
+    }
+
     private void OkButton_Click(object sender, RoutedEventArgs e)
     {
+        int? pilotId = (PilotComboBox.SelectedItem as Models.Pilot)?.Id;
+        int? weaponPartId = (WeaponComboBox.SelectedItem as WeaponPartOption)?.Id;
+        int? flyingResultId = (FlyingResultComboBox.SelectedItem as Models.FlyingResult)?.Id;
+
         var missing = new List<string>();
         if (DatePicker.Value == null)
             missing.Add("дата");
-        if (PilotComboBox.SelectedValue as int? == null)
+        if (!pilotId.HasValue)
             missing.Add("пілот");
-        if (WeaponComboBox.SelectedValue as int? == null)
+        if (!weaponPartId.HasValue)
             missing.Add("озброєння");
-        if (FlyingResultComboBox.SelectedValue as int? == null)
+        if (!flyingResultId.HasValue)
             missing.Add("результат польоту");
 
         if (missing.Count > 0)
@@ -172,14 +206,12 @@ public partial class RecordEditWindow : Window
             time = new TimeSpan(0, hh, mm, 0);
         }
 
-        int? pilotId = PilotComboBox.SelectedValue as int?;
-        int? squadId = SquadComboBox.SelectedValue as int?;
-        int? regionId = RegionComboBox.SelectedValue as int?;
-        int? weaponPartId = WeaponComboBox.SelectedValue as int?;
-        int? flyingResultId = FlyingResultComboBox.SelectedValue as int?;
-        int? reasonId = ReasonComboBox.SelectedValue as int?;
-        int? subreasonLostDroneId = SubreasonLostDroneComboBox.SelectedValue as int?;
-        int? subreasonTechId = SubreasonTechComboBox.SelectedValue as int?;
+        int? squadId = (SquadComboBox.SelectedItem as SquadItem)?.Id;
+        int? regionId = (RegionComboBox.SelectedItem as RegionItem)?.Id;
+        int? reasonId = (ReasonComboBox.SelectedItem as Models.Reason)?.Id;
+        int? subreasonLostDroneId = (SubreasonLostDroneComboBox.SelectedItem as Models.SubreasonLostDrone)?.Id;
+        int? subreasonTechId = (SubreasonTechComboBox.SelectedItem as Models.SubreasonTech)?.Id;
+        NormalizeReasonFieldsForSave(flyingResultId!.Value, ref reasonId, ref subreasonLostDroneId, ref subreasonTechId);
         var serialNumberInput = (SerialNumberTextBox.Text ?? string.Empty).Trim();
 
         // Если пользователь явно не выбрал эскадру (или форма загрузилась без selection),
@@ -212,38 +244,48 @@ public partial class RecordEditWindow : Window
             weatherCloudCover = null;
         }
 
-        using var db = new Data.AppDbContext();
-        if (_record == null)
+        try
         {
-            var newRecord = new Models.Record
+            using var db = new Data.AppDbContext();
+            if (_record == null)
             {
-                Date = DatePicker.Value!.Value.Date,
-                Time = time,
-                PilotId = pilotId,
-                SquadId = squadId,
-                RegionId = regionId,
-                WeaponPartId = weaponPartId,
-                SerialNumber = string.IsNullOrWhiteSpace(serialNumberInput) ? null : serialNumberInput,
-                FlyingResultId = flyingResultId,
-                ReasonId = reasonId,
-                SubreasonLostDroneId = subreasonLostDroneId,
-                SubreasonTechId = subreasonTechId,
-                WeatherTemperature = weatherTemperature,
-                WeatherWindDirection = weatherWindDirection,
-                WeatherWindSpeed = weatherWindSpeed,
-                WeatherPrecipitation = weatherPrecipitation,
-                WeatherCloudCover = weatherCloudCover,
-                Description = finalDescription,
-                UserId = _currentUser.Id,
-                Dlc = DateTime.Now
-            };
-            db.Records.Add(newRecord);
-        }
-        else
-        {
-            var entity = db.Records.Find(_record.Id);
-            if (entity != null)
+                var newRecord = new Models.Record
+                {
+                    Date = DatePicker.Value!.Value.Date,
+                    Time = time,
+                    PilotId = pilotId,
+                    SquadId = squadId,
+                    RegionId = regionId,
+                    WeaponPartId = weaponPartId,
+                    SerialNumber = string.IsNullOrWhiteSpace(serialNumberInput) ? null : serialNumberInput,
+                    FlyingResultId = flyingResultId,
+                    ReasonId = reasonId,
+                    SubreasonLostDroneId = subreasonLostDroneId,
+                    SubreasonTechId = subreasonTechId,
+                    WeatherTemperature = weatherTemperature,
+                    WeatherWindDirection = weatherWindDirection,
+                    WeatherWindSpeed = weatherWindSpeed,
+                    WeatherPrecipitation = weatherPrecipitation,
+                    WeatherCloudCover = weatherCloudCover,
+                    Description = finalDescription,
+                    UserId = _currentUser.Id,
+                    Dlc = DateTime.Now
+                };
+                db.Records.Add(newRecord);
+            }
+            else
             {
+                var entity = db.Records.Find(_record.Id);
+                if (entity == null)
+                {
+                    MessageBox.Show(
+                        "Запис з таким ідентифікатором не знайдено в базі (можливо, його вже видалили). Збереження неможливе.",
+                        "Помилка",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
                 entity.Date = DatePicker.Value!.Value.Date;
                 entity.Time = time;
                 entity.PilotId = pilotId;
@@ -264,9 +306,18 @@ public partial class RecordEditWindow : Window
                 entity.UserId = _currentUser.Id;
                 entity.Dlc = DateTime.Now;
             }
-        }
 
-        db.SaveChanges();
+            db.SaveChanges();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Не вдалося зберегти запис у базі:\n{ex.Message}",
+                "Помилка збереження",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return;
+        }
 
         DialogResult = true;
         Close();
@@ -514,7 +565,7 @@ else
 
     private void ApplyPilotFilterBySelectedSquad()
     {
-        var selectedPilotId = PilotComboBox.SelectedValue as int?;
+        int? selectedPilotId = (PilotComboBox.SelectedItem as Models.Pilot)?.Id;
 
         IEnumerable<Models.Pilot> source = _allPilots;
         if (SquadComboBox.SelectedValue is int squadId &&
@@ -528,7 +579,7 @@ else
         PilotComboBox.ItemsSource = filtered;
 
         if (selectedPilotId.HasValue && filtered.Any(p => p.Id == selectedPilotId.Value))
-            PilotComboBox.SelectedValue = selectedPilotId.Value;
+            PilotComboBox.SelectedItem = filtered.First(p => p.Id == selectedPilotId.Value);
         else
             PilotComboBox.SelectedIndex = -1;
     }

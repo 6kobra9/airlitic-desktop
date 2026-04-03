@@ -21,7 +21,7 @@ public static class ReportExcelExporter
         DataTable mainTable,
         DataTable lostTable,
         IReadOnlyList<WeaponsReportWindow.StackBarItem> mainChartRows,
-        IReadOnlyList<WeaponsReportWindow.LostStackSegment> lostChartSegments,
+        IReadOnlyList<WeaponsReportWindow.LostStackBarItem> lostChartRows,
         Stream? mainChartImagePng,
         Stream? lostChartImagePng)
     {
@@ -31,7 +31,7 @@ public static class ReportExcelExporter
         AddDataTableSheet(workbook, "Основна таблиця", mainTable);
         AddDataTableSheet(workbook, "Невдалі вильоти", lostTable);
         AddMainChartDataSheet(workbook, mainChartRows);
-        AddLostChartDataSheet(workbook, lostChartSegments);
+        AddLostChartDataSheet(workbook, lostChartRows);
 
         if (mainChartImagePng != null && mainChartImagePng.Length > 0)
             AddImageSheet(workbook, "Графік вильотів PNG", mainChartImagePng);
@@ -136,26 +136,35 @@ public static class ReportExcelExporter
         return null;
     }
 
-    private static void AddLostChartDataSheet(XLWorkbook wb, IReadOnlyList<WeaponsReportWindow.LostStackSegment> segments)
+    private static void AddLostChartDataSheet(XLWorkbook wb, IReadOnlyList<WeaponsReportWindow.LostStackBarItem> rows)
     {
         var ws = wb.Worksheets.Add(SafeSheetName("Дані графіка втрат"));
-        ws.Cell(1, 1).Value = "Причина";
-        ws.Cell(1, 2).Value = "Кількість (оцінка)";
-        ws.Cell(1, 3).Value = "Частка %";
+        ws.Cell(1, 1).Value = "Назва (засіб/пілот)";
+        ws.Cell(1, 2).Value = "Втрат (всього)";
+        ws.Cell(1, 3).Value = "Помилка пілота";
+        ws.Cell(1, 4).Value = "Технічні помилки";
+        ws.Cell(1, 5).Value = "Вороже збиття";
+        ws.Cell(1, 6).Value = "РЕБ свій";
+        ws.Cell(1, 7).Value = "РЕБ противника";
+        ws.Cell(1, 8).Value = "Погодні умови";
         ws.Row(1).Style.Font.Bold = true;
 
         var r = 2;
-        foreach (var seg in segments)
+        foreach (var item in rows)
         {
-            ws.Cell(r, 1).Value = seg.Label;
-            ws.Cell(r, 2).Value = seg.Count;
-            ws.Cell(r, 3).Value = seg.HeightPercent / 100.0;
-            ws.Cell(r, 3).Style.NumberFormat.Format = "0.00%";
+            ws.Cell(r, 1).Value = item.Label;
+            ws.Cell(r, 2).Value = item.TotalCount;
+            ws.Cell(r, 3).Value = item.PilotErrorCount;
+            ws.Cell(r, 4).Value = item.TechErrorCount;
+            ws.Cell(r, 5).Value = item.EnemyShotCount;
+            ws.Cell(r, 6).Value = item.OwnRebCount;
+            ws.Cell(r, 7).Value = item.EnemyRebCount;
+            ws.Cell(r, 8).Value = item.WeatherCount;
             r++;
         }
 
-        if (segments.Count > 0)
-            ws.Range(1, 1, r - 1, 3).SetAutoFilter();
+        if (rows.Count > 0)
+            ws.Range(1, 1, r - 1, 8).SetAutoFilter();
 
         ws.Columns().AdjustToContents();
     }

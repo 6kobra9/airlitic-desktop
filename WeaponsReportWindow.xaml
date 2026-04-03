@@ -7,8 +7,9 @@
         MinHeight="540" MinWidth="880"
         WindowStartupLocation="CenterOwner">
     <Window.Resources>
-        <local:DoubleToBarHeightConverter x:Key="MainHorizStackConverter" MaxHeight="280" />
-        <local:DoubleToBarHeightConverter x:Key="LostHorizStackConverter" MaxHeight="320" />
+        <!-- Ширина сегментів смуги = % × (ActualWidth ScrollViewer мінус підпис/KPI); масштабується з вікном -->
+        <local:ChartTrackSegmentWidthConverter x:Key="MainTrackWidthConv" ChromeReserve="218" MinTrackWidth="40"/>
+        <local:ChartTrackSegmentWidthConverter x:Key="LostTrackWidthConv" ChromeReserve="218" MinTrackWidth="40"/>
 
         <Style x:Key="ReportColumnHeaderStyle" TargetType="DataGridColumnHeader">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -152,23 +153,39 @@
                                 <TextBlock Text="Вісь X — кількість вильотів (макс. по звіту); смуга: вдалі (уражено) → невдалі → інші."
                                            FontSize="10" Foreground="#555" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
-                                        <Border Width="12" Height="12" Background="#16A34A" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,14,0"
+                                                ToolTipService.ShowDuration="20000"
+                                                ToolTipService.InitialShowDelay="200">
+                                        <StackPanel.ToolTip>
+                                            <TextBlock Text="Вдалі вильоти з результатом «уражено» за основною таблицею звіту (колонка з причиною «Уражено»)." TextWrapping="Wrap" MaxWidth="280"/>
+                                        </StackPanel.ToolTip>
+                                        <Border Width="12" Height="12" Background="#16A34A" Margin="0,0,6,0" VerticalAlignment="Center" Cursor="Hand"/>
                                         <TextBlock Text="Вдалі (уражено)" VerticalAlignment="Center" FontSize="10"/>
                                     </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,14,0">
-                                        <Border Width="12" Height="12" Background="#DC2626" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,14,0"
+                                                ToolTipService.ShowDuration="20000"
+                                                ToolTipService.InitialShowDelay="200">
+                                        <StackPanel.ToolTip>
+                                            <TextBlock Text="Невдалі вильоти за таблицею «невдалі вильоти» для цього ж пілота/засобу (сума по причинах втрати)." TextWrapping="Wrap" MaxWidth="280"/>
+                                        </StackPanel.ToolTip>
+                                        <Border Width="12" Height="12" Background="#DC2626" Margin="0,0,6,0" VerticalAlignment="Center" Cursor="Hand"/>
                                         <TextBlock Text="Невдалі вильоти" VerticalAlignment="Center" FontSize="10"/>
                                     </StackPanel>
-                                    <StackPanel Orientation="Horizontal">
-                                        <Border Width="12" Height="12" Background="#94A3B8" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal"
+                                                ToolTipService.ShowDuration="20000"
+                                                ToolTipService.InitialShowDelay="200">
+                                        <StackPanel.ToolTip>
+                                            <TextBlock Text="Інші вильоти: не зараховані як ураження та не входять до невдалих за нижньою таблицею (решта до загальної кількості)." TextWrapping="Wrap" MaxWidth="280"/>
+                                        </StackPanel.ToolTip>
+                                        <Border Width="12" Height="12" Background="#94A3B8" Margin="0,0,6,0" VerticalAlignment="Center" Cursor="Hand"/>
                                         <TextBlock Text="Інші" VerticalAlignment="Center" FontSize="10"/>
                                     </StackPanel>
                                 </StackPanel>
                             </StackPanel>
 
-                            <ScrollViewer Grid.Row="1"
-                                          VerticalScrollBarVisibility="Auto"
+                            <ScrollViewer x:Name="MainChartScroll"
+                                          Grid.Row="1"
+                                          VerticalScrollBarVisibility="Disabled"
                                           HorizontalScrollBarVisibility="Disabled"
                                           VerticalAlignment="Stretch"
                                           Padding="0,0,2,0">
@@ -180,45 +197,93 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid Margin="0,0,0,10" ToolTipService.ShowDuration="20000"
+                                            <Grid Margin="{Binding MainChartItemMargin, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  Height="{Binding MainChartRowHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  ClipToBounds="True"
+                                                  ToolTipService.ShowDuration="20000"
                                                   ToolTip="{Binding HoverSummary}">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="130" MinWidth="100"/>
                                                     <ColumnDefinition Width="*" MinWidth="160"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="10"
+                                                <TextBlock Grid.Column="0" Text="{Binding Label}"
+                                                           FontSize="{Binding MainChartLabelFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                           MaxHeight="{Binding MainChartLabelMaxHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                           TextTrimming="CharacterEllipsis"
                                                            TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                                <Border Grid.Column="1" Height="30" VerticalAlignment="Center"
+                                                <Border Grid.Column="1"
+                                                        Height="{Binding MainChartTrackHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        VerticalAlignment="Center"
                                                         BorderBrush="#CBD5E1" BorderThickness="0,0,0,1"
                                                         Background="#F8FAFC" SnapsToDevicePixels="True">
-                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4">
-                                                        <Border Height="22" VerticalAlignment="Center" CornerRadius="1" MinWidth="0" Margin="0,0,1,0"
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                                Margin="{Binding MainChartBarPanelPadding, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                        <Border Height="{Binding MainChartSegHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                VerticalAlignment="Center" CornerRadius="1" MinWidth="0" Margin="0,0,1,0"
                                                                 Background="#16A34A"
-                                                                Width="{Binding SuccessTrackPercent, Converter={StaticResource MainHorizStackConverter}}">
+                                                                ToolTipService.ShowDuration="20000"
+                                                                ToolTipService.InitialShowDelay="200"
+                                                                Cursor="Hand">
+                                                            <Border.ToolTip>
+                                                                <TextBlock Text="Вдалі (уражено): кількість вильотів з результатом «уражено» за основною таблицею." TextWrapping="Wrap" MaxWidth="260"/>
+                                                            </Border.ToolTip>
                                                             <TextBlock Text="{Binding SuccessCount, StringFormat={}{0}}"
                                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                       FontSize="8" Foreground="White"/>
+                                                                       FontSize="{Binding MainChartSegTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                       Foreground="White"/>
+                                                            <Border.Width>
+                                                                <MultiBinding Converter="{StaticResource MainTrackWidthConv}">
+                                                                    <Binding Path="SuccessTrackPercent"/>
+                                                                    <Binding ElementName="MainChartScroll" Path="ActualWidth"/>
+                                                                </MultiBinding>
+                                                            </Border.Width>
                                                         </Border>
-                                                        <Border Height="22" VerticalAlignment="Center" CornerRadius="1" MinWidth="0" Margin="0,0,1,0"
+                                                        <Border Height="{Binding MainChartSegHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                VerticalAlignment="Center" CornerRadius="1" MinWidth="0" Margin="0,0,1,0"
                                                                 Background="#DC2626"
-                                                                Width="{Binding FailedTrackPercent, Converter={StaticResource MainHorizStackConverter}}">
+                                                                ToolTipService.ShowDuration="20000"
+                                                                ToolTipService.InitialShowDelay="200"
+                                                                Cursor="Hand">
+                                                            <Border.ToolTip>
+                                                                <TextBlock Text="Невдалі вильоти: за таблицею невдалих вильотів для цього пілота/засобу." TextWrapping="Wrap" MaxWidth="260"/>
+                                                            </Border.ToolTip>
                                                             <TextBlock Text="{Binding FailedCount, StringFormat={}{0}}"
                                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                       FontSize="8" Foreground="White"/>
+                                                                       FontSize="{Binding MainChartSegTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                       Foreground="White"/>
+                                                            <Border.Width>
+                                                                <MultiBinding Converter="{StaticResource MainTrackWidthConv}">
+                                                                    <Binding Path="FailedTrackPercent"/>
+                                                                    <Binding ElementName="MainChartScroll" Path="ActualWidth"/>
+                                                                </MultiBinding>
+                                                            </Border.Width>
                                                         </Border>
-                                                        <Border Height="22" VerticalAlignment="Center" CornerRadius="1" MinWidth="0"
+                                                        <Border Height="{Binding MainChartSegHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                VerticalAlignment="Center" CornerRadius="1" MinWidth="0"
                                                                 Background="#94A3B8"
-                                                                Width="{Binding OtherTrackPercent, Converter={StaticResource MainHorizStackConverter}}">
+                                                                ToolTipService.ShowDuration="20000"
+                                                                ToolTipService.InitialShowDelay="200"
+                                                                Cursor="Hand">
+                                                            <Border.ToolTip>
+                                                                <TextBlock Text="Інші вильоти: решта до загальної кількості (не ураження й не зведені до невдалих у нижньому звіті)." TextWrapping="Wrap" MaxWidth="260"/>
+                                                            </Border.ToolTip>
                                                             <TextBlock Text="{Binding OtherCount, StringFormat={}{0}}"
                                                                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                       FontSize="8" Foreground="White"/>
+                                                                       FontSize="{Binding MainChartSegTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                       Foreground="White"/>
+                                                            <Border.Width>
+                                                                <MultiBinding Converter="{StaticResource MainTrackWidthConv}">
+                                                                    <Binding Path="OtherTrackPercent"/>
+                                                                    <Binding ElementName="MainChartScroll" Path="ActualWidth"/>
+                                                                </MultiBinding>
+                                                            </Border.Width>
                                                         </Border>
                                                     </StackPanel>
                                                 </Border>
                                                 <TextBlock Grid.Column="2"
                                                            Text="{Binding KpiDisplay}"
-                                                           FontSize="10"
+                                                           FontSize="{Binding MainChartLabelFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
                                                            FontWeight="SemiBold"
                                                            Foreground="#0F172A"
                                                            VerticalAlignment="Center"
@@ -303,41 +368,178 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Text="Причини втрати (сума за період, накопичувально)"
+                            <TextBlock Grid.Row="0" Text="Причини втрати по кожному рядку (горизонтальна шкала)"
                                        FontWeight="SemiBold" Margin="0,0,0,10"/>
 
-                            <ScrollViewer Grid.Row="1"
+                            <ScrollViewer x:Name="LostChartScroll"
+                                          Grid.Row="1"
                                           VerticalScrollBarVisibility="Disabled"
-                                          HorizontalScrollBarVisibility="Auto"
-                                          VerticalAlignment="Center"
-                                          HorizontalAlignment="Stretch">
-                                <Border HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        BorderBrush="#4C1D95" BorderThickness="1" CornerRadius="2"
-                                        MinWidth="240" Height="44" Background="#FAF5FF" Padding="3"
-                                        SnapsToDevicePixels="True">
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Stretch" HorizontalAlignment="Left">
-                                        <ItemsControl ItemsSource="{Binding LostStackSegments}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal"/>
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Width="{Binding HeightPercent, Converter={StaticResource LostHorizStackConverter}}"
-                                                            MinWidth="2" Height="36" Background="{Binding BarBrush}"
-                                                            Margin="0,0,1,0">
-                                                        <TextBlock Text="{Binding Count, StringFormat={}{0}}"
-                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                                   FontSize="8" Foreground="{Binding CountForeground}"
-                                                                   TextTrimming="CharacterEllipsis"/>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </StackPanel>
-                                </Border>
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalAlignment="Stretch"
+                                          Padding="0,0,2,0">
+                                <ItemsControl ItemsSource="{Binding LostStackItems}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Vertical"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="{Binding LostChartItemMargin, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  Height="{Binding LostChartRowHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  ClipToBounds="True"
+                                                  ToolTipService.ShowDuration="20000"
+                                                  ToolTip="{Binding HoverSummary}">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="130" MinWidth="100"/>
+                                                    <ColumnDefinition Width="*" MinWidth="160"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Label}"
+                                                           FontSize="{Binding LostChartLabelFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                           MaxHeight="{Binding LostChartLabelMaxHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                <Border Grid.Column="1"
+                                                        Height="{Binding LostChartTrackHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        VerticalAlignment="Center"
+                                                        BorderBrush="#4C1D95" BorderThickness="0,0,0,1"
+                                                        Background="#FAF5FF" SnapsToDevicePixels="True">
+                                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                                Margin="{Binding LostChartBarPanelPadding, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                        <Border Height="{Binding LostChartSegHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                VerticalAlignment="Center" CornerRadius="1" MinWidth="0" Margin="0,0,1,0"
+                                                                Background="#3B0764"
+                                                                ToolTipService.ShowDuration="20000"
+                                                                ToolTipService.InitialShowDelay="200"
+                                                                Cursor="Hand">
+                                                            <Border.ToolTip>
+                                                                <TextBlock Text="Помилка пілота: оцінка кількості втрат (KPI «помилка пілота» × невдалі вильоти)." TextWrapping="Wrap" MaxWidth="260"/>
+                                                            </Border.ToolTip>
+                                                            <TextBlock Text="{Binding PilotErrorCount, StringFormat={}{0}}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                       FontSize="{Binding LostChartSegTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                       Foreground="White"/>
+                                                            <Border.Width>
+                                                                <MultiBinding Converter="{StaticResource LostTrackWidthConv}">
+                                                                    <Binding Path="PilotErrorTrackPercent"/>
+                                                                    <Binding ElementName="LostChartScroll" Path="ActualWidth"/>
+                                                                </MultiBinding>
+                                                            </Border.Width>
+                                                        </Border>
+                                                        <Border Height="{Binding LostChartSegHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                VerticalAlignment="Center" CornerRadius="1" MinWidth="0" Margin="0,0,1,0"
+                                                                Background="#5B21B6"
+                                                                ToolTipService.ShowDuration="20000"
+                                                                ToolTipService.InitialShowDelay="200"
+                                                                Cursor="Hand">
+                                                            <Border.ToolTip>
+                                                                <TextBlock Text="Технічні помилки: оцінка втрат через технічні несправності." TextWrapping="Wrap" MaxWidth="260"/>
+                                                            </Border.ToolTip>
+                                                            <TextBlock Text="{Binding TechErrorCount, StringFormat={}{0}}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                       FontSize="{Binding LostChartSegTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                       Foreground="White"/>
+                                                            <Border.Width>
+                                                                <MultiBinding Converter="{StaticResource LostTrackWidthConv}">
+                                                                    <Binding Path="TechErrorTrackPercent"/>
+                                                                    <Binding ElementName="LostChartScroll" Path="ActualWidth"/>
+                                                                </MultiBinding>
+                                                            </Border.Width>
+                                                        </Border>
+                                                        <Border Height="{Binding LostChartSegHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                VerticalAlignment="Center" CornerRadius="1" MinWidth="0" Margin="0,0,1,0"
+                                                                Background="#7C2D92"
+                                                                ToolTipService.ShowDuration="20000"
+                                                                ToolTipService.InitialShowDelay="200"
+                                                                Cursor="Hand">
+                                                            <Border.ToolTip>
+                                                                <TextBlock Text="Вороже збиття: оцінка втрат через збиття супротивником." TextWrapping="Wrap" MaxWidth="260"/>
+                                                            </Border.ToolTip>
+                                                            <TextBlock Text="{Binding EnemyShotCount, StringFormat={}{0}}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                       FontSize="{Binding LostChartSegTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                       Foreground="White"/>
+                                                            <Border.Width>
+                                                                <MultiBinding Converter="{StaticResource LostTrackWidthConv}">
+                                                                    <Binding Path="EnemyShotTrackPercent"/>
+                                                                    <Binding ElementName="LostChartScroll" Path="ActualWidth"/>
+                                                                </MultiBinding>
+                                                            </Border.Width>
+                                                        </Border>
+                                                        <Border Height="{Binding LostChartSegHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                VerticalAlignment="Center" CornerRadius="1" MinWidth="0" Margin="0,0,1,0"
+                                                                Background="#A21CAF"
+                                                                ToolTipService.ShowDuration="20000"
+                                                                ToolTipService.InitialShowDelay="200"
+                                                                Cursor="Hand">
+                                                            <Border.ToolTip>
+                                                                <TextBlock Text="РЕБ свій: оцінка втрат через дію власного радіоелектронного подавлення." TextWrapping="Wrap" MaxWidth="260"/>
+                                                            </Border.ToolTip>
+                                                            <TextBlock Text="{Binding OwnRebCount, StringFormat={}{0}}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                       FontSize="{Binding LostChartSegTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                       Foreground="White"/>
+                                                            <Border.Width>
+                                                                <MultiBinding Converter="{StaticResource LostTrackWidthConv}">
+                                                                    <Binding Path="OwnRebTrackPercent"/>
+                                                                    <Binding ElementName="LostChartScroll" Path="ActualWidth"/>
+                                                                </MultiBinding>
+                                                            </Border.Width>
+                                                        </Border>
+                                                        <Border Height="{Binding LostChartSegHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                VerticalAlignment="Center" CornerRadius="1" MinWidth="0" Margin="0,0,1,0"
+                                                                Background="#C026D3"
+                                                                ToolTipService.ShowDuration="20000"
+                                                                ToolTipService.InitialShowDelay="200"
+                                                                Cursor="Hand">
+                                                            <Border.ToolTip>
+                                                                <TextBlock Text="РЕБ противника: оцінка втрат через РЕБ супротивника." TextWrapping="Wrap" MaxWidth="260"/>
+                                                            </Border.ToolTip>
+                                                            <TextBlock Text="{Binding EnemyRebCount, StringFormat={}{0}}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                       FontSize="{Binding LostChartSegTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                       Foreground="White"/>
+                                                            <Border.Width>
+                                                                <MultiBinding Converter="{StaticResource LostTrackWidthConv}">
+                                                                    <Binding Path="EnemyRebTrackPercent"/>
+                                                                    <Binding ElementName="LostChartScroll" Path="ActualWidth"/>
+                                                                </MultiBinding>
+                                                            </Border.Width>
+                                                        </Border>
+                                                        <Border Height="{Binding LostChartSegHeight, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                VerticalAlignment="Center" CornerRadius="1" MinWidth="0"
+                                                                Background="#F5D0FE"
+                                                                ToolTipService.ShowDuration="20000"
+                                                                ToolTipService.InitialShowDelay="200"
+                                                                Cursor="Hand">
+                                                            <Border.ToolTip>
+                                                                <TextBlock Text="Погодні умови: оцінка втрат через погоду." TextWrapping="Wrap" MaxWidth="260"/>
+                                                            </Border.ToolTip>
+                                                            <TextBlock Text="{Binding WeatherCount, StringFormat={}{0}}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                       FontSize="{Binding LostChartSegTextFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                       Foreground="#590C6D"/>
+                                                            <Border.Width>
+                                                                <MultiBinding Converter="{StaticResource LostTrackWidthConv}">
+                                                                    <Binding Path="WeatherTrackPercent"/>
+                                                                    <Binding ElementName="LostChartScroll" Path="ActualWidth"/>
+                                                                </MultiBinding>
+                                                            </Border.Width>
+                                                        </Border>
+                                                    </StackPanel>
+                                                </Border>
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding TotalCount, StringFormat={}{0}}"
+                                                           FontSize="{Binding LostChartLabelFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="#0F172A"
+                                                           VerticalAlignment="Center"
+                                                           Margin="12,0,0,0" MinWidth="36"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </ScrollViewer>
 
                             <TextBlock x:Name="LostChartAxisText"
@@ -357,16 +559,21 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <StackPanel Orientation="Horizontal" Margin="0,0,12,6">
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,12,6"
+                                                        ToolTipService.ShowDuration="20000"
+                                                        ToolTipService.InitialShowDelay="200">
+                                                <StackPanel.ToolTip>
+                                                    <TextBlock Text="{Binding TooltipHint}" TextWrapping="Wrap" MaxWidth="280"/>
+                                                </StackPanel.ToolTip>
                                                 <Border Width="11" Height="11" Background="{Binding BarBrush}"
-                                                        BorderBrush="#4C1D95" BorderThickness="1" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                                        BorderBrush="#4C1D95" BorderThickness="1" Margin="0,0,5,0" VerticalAlignment="Center" Cursor="Hand"/>
                                                 <TextBlock Text="{Binding Label}" FontSize="8" VerticalAlignment="Center"
                                                            TextWrapping="Wrap" MaxWidth="110"/>
                                             </StackPanel>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
-                                <TextBlock Text="Сегменти підсумовані по всіх рядках таблиці невдалих вильотів"
+                                <TextBlock Text="Кожен рядок має окремий накопичувальний стовпчик; довжина відносно максимуму по звіту"
                                            FontSize="8" Foreground="#666" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Grid>

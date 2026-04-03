@@ -23,6 +23,7 @@ public class Record
     public int? ReasonId { get; set; }
     [Column("serial_number")]
     public string? SerialNumber { get; set; }
+    [Column("description")]
     public string Description { get; set; } = string.Empty;
 
     [Column("weather_temperature")]

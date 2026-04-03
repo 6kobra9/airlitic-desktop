@@ -21,13 +21,33 @@ public static class ReportSql
     public const string WeaponsMainTemplate = @"
 declare @colls nvarchar(max);
 declare @collsIsnull nvarchar(max);
+declare @hitId int;
+declare @hitExpr nvarchar(200);
 
-select @colls = string_agg(quotename(flying_result.name), ',')
-from flying_result;
+select @colls = string_agg(quotename(cast(src.id as nvarchar(20))), ',')
+from (
+    select id, ltrim(rtrim(name)) as name
+    from flying_result
+    where name is not null and ltrim(rtrim(name)) <> ''
+) src;
+
+select top(1) @hitId = id
+from flying_result
+where ltrim(rtrim(name)) = N'Уражено'
+order by id;
+
+set @hitExpr = case
+    when @hitId is null then N'0'
+    else N'isnull(' + quotename(cast(@hitId as nvarchar(20))) + N', 0)'
+end;
 
 -- PIVOT дає NULL без рядків для комбінації — підставляємо 0
-select @collsIsnull = string_agg('isnull(' + quotename(name) + ', 0) as ' + quotename(name), ',')
-from flying_result;
+select @collsIsnull = string_agg('isnull(' + quotename(cast(src.id as nvarchar(20))) + ', 0) as ' + quotename(src.name), ',')
+from (
+    select id, ltrim(rtrim(name)) as name
+    from flying_result
+    where name is not null and ltrim(rtrim(name)) <> ''
+) src;
 
 declare @sql nvarchar(max) = N'
 select
@@ -36,14 +56,14 @@ select
     ' + @collsIsnull + ',
     case
         when TotalHits = 0 then 0
-        else round(isnull([Уражено], 0) * 100.0 / TotalHits, 2)
+        else round((' + @hitExpr + N') * 100.0 / TotalHits, 2)
     end N''KPI''
 from
 (
     select
         p.name as weaponName,
         r.id as ResultId,
-        rs.name as ReasonName
+        rs.id as ReasonId
     from results r
     left join weapon_parts wp on wp.id = r.weapon_part_id
     left join weapon p on p.id = wp.weapon_id
@@ -53,7 +73,7 @@ from
 pivot
 (
     count(ResultId)
-    for ReasonName in (' + @colls + ')
+    for ReasonId in (' + @colls + ')
 ) p
 cross apply (
     select count(*) as TotalHits
@@ -74,6 +94,8 @@ exec sp_executesql @sql;
     public const string WeaponsLostTemplate = @"
 declare @colls nvarchar(max);
 declare @collsIsnull nvarchar(max);
+declare @hitId int;
+declare @hitExpr nvarchar(200);
 
 select @colls = string_agg(quotename(name), ',')
 from subreason_lost_drone;
@@ -147,12 +169,32 @@ exec sp_executesql @sql;
     public const string PilotsMainTemplate = @"
 declare @colls nvarchar(max);
 declare @collsIsnull nvarchar(max);
+declare @hitId int;
+declare @hitExpr nvarchar(200);
 
-select @colls = string_agg(quotename(flying_result.name), ',')
-from flying_result;
+select @colls = string_agg(quotename(cast(src.id as nvarchar(20))), ',')
+from (
+    select id, ltrim(rtrim(name)) as name
+    from flying_result
+    where name is not null and ltrim(rtrim(name)) <> ''
+) src;
 
-select @collsIsnull = string_agg('isnull(' + quotename(name) + ', 0) as ' + quotename(name), ',')
-from flying_result;
+select top(1) @hitId = id
+from flying_result
+where ltrim(rtrim(name)) = N'Уражено'
+order by id;
+
+set @hitExpr = case
+    when @hitId is null then N'0'
+    else N'isnull(' + quotename(cast(@hitId as nvarchar(20))) + N', 0)'
+end;
+
+select @collsIsnull = string_agg('isnull(' + quotename(cast(src.id as nvarchar(20))) + ', 0) as ' + quotename(src.name), ',')
+from (
+    select id, ltrim(rtrim(name)) as name
+    from flying_result
+    where name is not null and ltrim(rtrim(name)) <> ''
+) src;
 
 declare @sql nvarchar(max) = N'
 select
@@ -161,14 +203,14 @@ select
     ' + @collsIsnull + ',
     round(case
         when TotalHits = 0 then 0
-        else (isnull([Уражено], 0) * 100.00/ TotalHits)
+        else ((' + @hitExpr + N') * 100.00/ TotalHits)
     end,4) N''KPI''
 from
 (
     select
         p.name as PilotName,
         r.id   as ResultId,
-        rs.name as ReasonName
+        rs.id as ReasonId
     from results r
     left join pilot         p  on p.id  = r.pilot_id
     left join flying_result rs on rs.id = r.flying_result_id
@@ -177,7 +219,7 @@ from
 pivot
 (
     count(ResultId)
-    for ReasonName in (' + @colls + ')
+    for ReasonId in (' + @colls + ')
 ) p
 cross apply (
     select
